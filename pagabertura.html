@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prontuário Digital do Talhão</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,700;9..144,800&display=swap" rel="stylesheet">
+  <style>
+/* Prontuário Digital do Talhão — estilos compartilhados (landing + dashboard) */
+
+:root {
+  --verde-escuro: #4a5e23;
+  --verde: #84a547;
+  --verde-claro: #e4eee3;
+  --creme: #faf7f2;
+  --areia: #ece3d0;
+  --card: #f4eadd;
+  --borda-card: #e6d7bc;
+  --texto: #2d2d24;
+  --texto-suave: #5d5d50;
+  --laranja: #d49a4b;
+  --vermelho: #b9533f;
+  --roxo: #8e4fc4;
+  --fonte-titulo: "Fraunces", Georgia, "Times New Roman", serif;
+  --fonte-texto: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--fonte-texto);
+  color: var(--texto);
+  background: var(--creme);
+  line-height: 1.5;
+}
+
+h1, h2, h3 { font-family: var(--fonte-titulo); color: var(--verde-escuro); margin: 0; }
+
+a { color: inherit; text-decoration: none; }
+
+/* ---------- Marca ---------- */
+.marca { display: flex; align-items: center; gap: 10px; }
+.marca-icone {
+  width: 26px; height: 26px; border-radius: 7px; flex: none;
+  background: var(--verde-escuro); display: grid; place-items: center;
+}
+.marca-icone svg { width: 16px; height: 16px; }
+.marca-nome { font-family: var(--fonte-titulo); font-weight: 700; color: var(--verde-escuro); line-height: 1.15; }
+
+/* ---------- Botões ---------- */
+.botao {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  font: 600 13px var(--fonte-texto); border-radius: 10px; padding: 10px 18px;
+  border: 2px solid transparent; transition: filter .15s, transform .15s;
+}
+.botao:hover { filter: brightness(.95); }
+.botao:active { transform: translateY(1px); }
+.botao:focus-visible { outline: 3px solid #b6d27a; outline-offset: 2px; }
+.botao-verde { background: var(--verde); color: #fff; }
+.botao-contorno { background: #fdeccb; color: var(--verde-escuro); border-color: var(--verde-escuro); }
+.botao-branco { background: #fff; color: var(--verde-escuro); }
+
+/* ================= LANDING ================= */
+.topo {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 50px; border-bottom: 2px solid #efe9dd;
+}
+.topo .marca-nome { font-size: 18px; }
+.topo-acoes { display: flex; gap: 12px; }
+
+.heroi {
+  display: flex; align-items: center; justify-content: space-between; gap: 40px;
+  padding: 56px 50px 62px;
+}
+.heroi-texto { max-width: 400px; }
+.heroi h1 { font-size: 40px; line-height: 1.18; font-weight: 800; }
+.heroi p { font-size: 13.5px; color: var(--texto); margin: 24px 0 22px; }
+.heroi-cta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.heroi-cta .botao { padding: 11px 18px; }
+.selo { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 600; }
+.selo svg { width: 14px; height: 14px; }
+.heroi-arte { width: 175px; height: 150px; border-radius: 18px; overflow: hidden; flex: none; }
+.heroi-arte svg { display: block; width: 100%; height: 100%; }
+
+.recursos { background: var(--areia); padding: 48px 50px 56px; }
+.recursos h2 { font-size: 24px; font-weight: 800; }
+.recursos-sub { margin: 4px 0 28px; font-size: 12px; }
+.recursos-grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start; }
+.recurso { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 6px 16px rgba(80, 60, 20, .08); }
+.recurso-icone { width: 36px; height: 36px; border-radius: 10px; background: var(--areia); display: grid; place-items: center; margin-bottom: 14px; }
+.recurso-icone svg { width: 20px; height: 20px; }
+.recurso h3 { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+.recurso p { margin: 0; font-size: 10.5px; color: var(--texto); }
+
+.rodape { padding: 22px 50px 28px; font-size: 9px; color: var(--texto-suave); border-top: 2px solid #efe9dd; }
+
+/* ================= DASHBOARD ================= */
+.app { display: grid; grid-template-columns: 180px 1fr; min-height: 100vh; }
+
+.lateral {
+  background: var(--areia); border-right: 2px solid #e2d6bd;
+  padding: 18px 10px; display: flex; flex-direction: column;
+}
+.lateral .marca { padding: 0 6px; margin-bottom: 20px; }
+.lateral .marca-nome { font-size: 12px; }
+.lateral-rotulo { font-size: 8px; font-weight: 700; letter-spacing: .06em; color: var(--texto-suave); padding: 0 6px; margin-bottom: 6px; }
+.menu { display: flex; flex-direction: column; gap: 6px; }
+.menu a {
+  display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 8px;
+  font-size: 11px; color: var(--texto-suave);
+}
+.menu a svg { width: 14px; height: 14px; flex: none; }
+.menu a:hover { background: rgba(255, 255, 255, .45); }
+.menu a.ativo { background: var(--verde-claro); color: var(--texto); font-weight: 700; }
+
+.area-monitorada { margin-top: auto; background: #edf1ee; border-radius: 12px; padding: 12px; }
+.area-monitorada small { display: block; font-size: 8px; }
+.area-monitorada .rotulo { font-weight: 700; font-size: 9px; margin-bottom: 4px; }
+.area-monitorada .valor { font-family: var(--fonte-titulo); font-size: 18px; color: var(--verde-escuro); }
+
+.principal { padding: 22px 32px 40px; min-width: 0; }
+.principal-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+.principal-topo h1 { font-size: 26px; font-weight: 800; }
+.principal-topo p { margin: 2px 0 0; font-size: 11.5px; color: var(--texto-suave); }
+.botao-novo { background: var(--verde); color: #fff; border: 2px solid var(--verde-escuro); border-radius: 8px; padding: 10px 14px; font-size: 13px; white-space: nowrap; }
+
+.cartao { background: var(--card); border: 2px solid var(--borda-card); border-radius: 18px; padding: 16px 18px; }
+
+.indicadores { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 20px; }
+.indicador .nome { font-size: 11.5px; color: var(--texto-suave); }
+.indicador .numero { font-size: 26px; font-weight: 500; margin: 4px 0 2px; }
+.indicador .nota { font-size: 8.5px; min-height: 12px; }
+.nota.verde { color: var(--verde); }
+.nota.laranja { color: #dbb98a; }
+.nota.vermelho { color: #d88f80; }
+
+.painel { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.painel h2 { font-size: 15px; font-weight: 800; }
+.painel .sub { font-size: 8.5px; color: var(--texto-suave); margin: 2px 0 12px; }
+
+.barra { display: flex; height: 12px; border-radius: 8px; overflow: hidden; background: #e2d6bd; }
+.barra span { display: block; height: 100%; }
+.seg-saudavel { background: var(--verde); }
+.seg-atencao { background: var(--laranja); }
+.seg-risco { background: var(--vermelho); }
+
+.legenda { display: flex; gap: 14px; flex-wrap: wrap; margin: 8px 0 12px; font-size: 8.5px; }
+.legenda span { display: inline-flex; align-items: center; gap: 4px; }
+.ponto { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
+
+.subtitulo { font-size: 9px; font-weight: 600; margin-bottom: 6px; }
+.alerta {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  background: rgba(255, 255, 255, .35); border: 2px solid var(--borda-card);
+  border-radius: 8px; padding: 8px 10px; margin-bottom: 8px;
+}
+.alerta strong { display: block; font-size: 9.5px; font-weight: 600; }
+.alerta span.detalhe { font-size: 8.5px; color: var(--texto-suave); }
+.etiqueta { font-size: 7.5px; font-weight: 600; border-radius: 99px; padding: 3px 9px; white-space: nowrap; }
+.etiqueta.risco { background: #efc9c0; color: var(--vermelho); border: 1px solid #e3a99c; }
+.etiqueta.atencao { background: #ecd3a8; color: #b07a2e; border: 1px solid #deba84; }
+.vazio { font-size: 9.5px; color: var(--texto-suave); }
+
+.atividade-lista { list-style: none; margin: 0; padding: 0; }
+.atividade-lista li { padding: 7px 0 8px; border-bottom: 1px solid #dccfb3; }
+.atividade-lista li:last-child { border-bottom: 0; }
+.atividade-lista .titulo { display: flex; align-items: center; gap: 6px; font-size: 9.5px; font-weight: 600; }
+.atividade-lista .quando { font-size: 8.5px; color: var(--texto-suave); margin: 2px 0 0 13px; }
+
+.chamada {
+  margin-top: 36px; background: var(--verde-escuro); color: #fff; border-radius: 16px;
+  padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.chamada h2 { color: #fff; font-family: var(--fonte-texto); font-weight: 500; font-size: 17px; }
+.chamada p { margin: 2px 0 0; font-size: 10px; color: #cfd9b8; }
+.chamada .botao { padding: 11px 18px; border-radius: 8px; }
+
+.erro { margin: 24px 0; padding: 14px 16px; border-radius: 12px; background: #f6d9d2; color: #8c3a2a; font-size: 12px; }
+
+/* ================= RESPONSIVO ================= */
+@media (max-width: 860px) {
+  .topo, .heroi, .recursos, .rodape { padding-left: 24px; padding-right: 24px; }
+  .heroi { flex-direction: column; align-items: flex-start; }
+  .recursos-grade { grid-template-columns: 1fr; }
+  .app { grid-template-columns: 1fr; }
+  .lateral { border-right: 0; border-bottom: 2px solid #e2d6bd; }
+  .menu { flex-direction: row; flex-wrap: wrap; }
+  .area-monitorada { display: none; }
+  .indicadores { grid-template-columns: repeat(2, 1fr); }
+  .painel { grid-template-columns: 1fr; }
+  .principal { padding: 20px 16px 32px; }
+}
+
+</style>
+</head>
+<body>
+
+  <header class="topo">
+    <a class="marca" href="index.html" aria-label="Prontuário Digital do Talhão">
+      <span class="marca-icone" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-9"/><path d="M12 12c0-4 3-6 7-6 0 4-3 6-7 6z"/><path d="M12 15c0-3-2-5-6-5 0 3 2 5 6 5z"/></svg>
+      </span>
+      <span class="marca-nome">Prontuário Digital do Talhão</span>
+    </a>
+    <nav class="topo-acoes">
+      <a class="botao botao-contorno" href="dashboard.html">Entrar</a>
+      <a class="botao botao-verde" href="dashboard.html">Cadastre-se</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="heroi">
+      <div class="heroi-texto">
+        <h1>O histórico completo da sua terra, na palma da mão</h1>
+        <p>Acompanhe o plantio, simule rotação de culturas e entenda a saúde do seu solo de forma simples. Feito especialmente para quem vive da terra e quer cuidar do futuro do seu talhão com facilidade.</p>
+        <div class="heroi-cta">
+          <a class="botao botao-verde" href="dashboard.html">Comece agora gratuitamente
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <span class="selo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.2 3.2 0 0 1 0 6.2M18 14.5c2 .8 3.5 2.8 3.5 5.5"/></svg>
+            Pensado para pequenos produtores rurais e agricultura familiar
+          </span>
+        </div>
+      </div>
+
+      <div class="heroi-arte" role="img" aria-label="Ilustração de colinas cultivadas com uma árvore e um sol sorridente">
+        <svg viewBox="0 0 175 150" xmlns="http://www.w3.org/2000/svg">
+          <rect width="175" height="150" fill="#f8f2df"/>
+          <g stroke="#f0b960" stroke-width="1.6" stroke-linecap="round">
+            <path d="M138 8v4M138 36v4M114 22h4M158 22h4M121 9l3 3M152 9l-3 3M121 35l3-3M152 35l-3-3"/>
+          </g>
+          <circle cx="138" cy="22" r="11" fill="#f7c76e"/>
+          <circle cx="134" cy="21" r="1" fill="#b57b2a"/><circle cx="142" cy="21" r="1" fill="#b57b2a"/>
+          <path d="M135 26q3 2.5 6 0" stroke="#b57b2a" stroke-width="1" fill="none" stroke-linecap="round"/>
+          <path d="M70 80c30-14 70-20 105-10v30H70z" fill="#f1b58a"/>
+          <path d="M0 78c35-10 75-8 110 6 25 10 45 28 65 40v26H0z" fill="#8a9a52"/>
+          <path d="M0 86c30-8 60-6 90 8" stroke="#7a8a45" stroke-width="1" fill="none"/>
+          <path d="M0 96c35-8 70-4 100 10" stroke="#7a8a45" stroke-width="1" fill="none"/>
+          <path d="M0 108c35-6 70 0 100 14" stroke="#7a8a45" stroke-width="1" fill="none"/>
+          <path d="M0 98c24-4 40 6 52 22 8 10 14 20 18 30H0z" fill="#d2826a"/>
+          <path d="M80 116c30-18 70-14 95 4v30H88z" fill="#7d8c47"/>
+          <rect x="62" y="56" width="5" height="22" rx="2" fill="#a2552f"/>
+          <ellipse cx="64" cy="48" rx="22" ry="16" fill="#e08a3c"/>
+          <ellipse cx="54" cy="52" rx="10" ry="8" fill="#d97a2d"/>
+          <ellipse cx="74" cy="44" rx="9" ry="7" fill="#eaa050"/>
+        </svg>
+      </div>
+    </section>
+
+    <section class="recursos">
+      <h2>Tudo o que você precisa para organizar sua lavoura</h2>
+      <p class="recursos-sub">Ferramentas descomplicadas criadas em parceria com agricultores familiares.</p>
+
+      <div class="recursos-grade">
+        <article class="recurso">
+          <div class="recurso-icone" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="#1f1f1a"><path d="M11 21c0-6 1-10 7-13 .5 5-1 9-4.5 11.5C12.5 20.2 11.8 20.7 11 21z"/><path d="M11.5 21C11 15 8 11 2.5 10.5 3 15 6 18 11.5 21z"/></svg>
+          </div>
+          <h3>Histórico do Talhão</h3>
+          <p>Anote adubações, colheitas e pragas de forma rápida. O prontuário guarda tudo por ano e safra sem complicação.</p>
+        </article>
+
+        <article class="recurso">
+          <div class="recurso-icone" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#1f1f1a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v3M16 2.5v3"/><path d="M8 16h3l1.5-3 1.5 3h2"/></svg>
+          </div>
+          <h3>Visualização em Linha do Tempo</h3>
+          <p>Veja o ciclo da sua plantação se desenhar em uma linha visual colorida e fácil de entender, mesmo sem prática.</p>
+        </article>
+
+        <article class="recurso">
+          <div class="recurso-icone" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#1f1f1a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v17M7 20h10M5 7h14"/><path d="M5 7l-3 7a3.5 3.5 0 0 0 6 0L5 7zM19 7l-3 7a3.5 3.5 0 0 0 6 0l-3-7z"/></svg>
+          </div>
+          <h3>Simulador de Rotação</h3>
+          <p>Simule qual cultura plantar a seguir para manter a terra gorda, forte e economizar em adubos químicos.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="rodape">© 2026 Prontuário Digital do Talhão. Todos os direitos reservados.</footer>
+
+</body>
+</html>
