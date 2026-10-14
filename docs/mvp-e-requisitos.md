@@ -21,7 +21,6 @@ Sistema web que permite ao pequeno e médio produtor rural registrar o históric
 
 ## 2. Escopo do MVP
 
-### Dentro do escopo
 1. Cadastro, login e recuperação de senha
 2. Dashboard (visão geral da propriedade)
 3. Cadastro de talhões
@@ -32,18 +31,6 @@ Sistema web que permite ao pequeno e médio produtor rural registrar o históric
 8. Recomendação de cultura baseada em regras documentadas e com fonte
 9. Exportação do prontuário em PDF
 10. Gestão de perfil e logout
-
-### Fora do escopo (não será desenvolvido)
-- Recomendação de calagem e adubação (doses de calcário ou fertilizantes)
-- Diagnóstico agronômico ou receituário
-- Sensores IoT e leitura automática de dados de solo
-- Imagens de satélite, NDVI e mapas de calor
-- Clima e previsão do tempo em tempo real
-- Modelos preditivos de produtividade (machine learning)
-- Integração em tempo real com APIs externas (ex: AgroAPI/Embrapa). As regras vêm de fontes oficiais, mas ficam em base própria.
-- Aplicativo mobile nativo
-- Módulo colaborativo entre produtores
-- Múltiplas propriedades por conta (fora do MVP, mas a arquitetura não deve impedir; ver RNF08)
 
 ---
 
