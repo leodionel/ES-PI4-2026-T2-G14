@@ -14,6 +14,8 @@ abstract class AuthRepository extends ChangeNotifier {
   //Solicita a autentiucacao com email e senha
   Future<void> entrar(String email, String senha);
 
+
+
   //Encerra a sessao
   Future<void> sair();
 }

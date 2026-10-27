@@ -7,6 +7,7 @@ import '../core/widgets/app_button.dart';
 import '../core/widgets/app_text_field.dart';
 import '../core/utils/validators.dart';
 import 'login_view_model.dart';
+import 'recuperacao_senha.dart';
 
 // Tela de entrada do app
 class Login extends StatefulWidget {
@@ -131,7 +132,20 @@ class _LoginState extends State<Login> {
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
-            onPressed: vm.carregando ? null : widget.aoRecuperarSenha,
+            onPressed: vm.carregando
+    ? null
+    : () {
+        if (widget.aoRecuperarSenha != null) {
+          widget.aoRecuperarSenha!();
+        } else {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) =>
+                  const RecuperacaoSenha(),
+            ),
+          );
+        }
+      },
             child: const Text(AppTextos.esqueciSenha),
           ),
         ),
