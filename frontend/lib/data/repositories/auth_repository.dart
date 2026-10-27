@@ -16,4 +16,12 @@ abstract class AuthRepository extends ChangeNotifier {
 
   //Encerra a sessao
   Future<void> sair();
+
+  //Solicita a criacao da conta
+  Future<void> cadastrar(
+    String nome,
+    String email,
+    String telefone,
+    String senha,
+  );
 }
