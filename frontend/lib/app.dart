@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-// Tela de login
-import 'telas/login.dart';
+// Tela inicial do aplicativo
+import 'telas/dashboard.dart';
+import 'core/theme/app_theme.dart';
 
 // Configuração principal do app
 class App extends StatelessWidget {
@@ -13,10 +14,11 @@ class App extends StatelessWidget {
       // Tira a faixa de debug do canto
       debugShowCheckedModeBanner: false,
 
-      title: 'Prontuário Digital do Talhão',
+      title: 'Pay4 · Prontuário Digital do Talhão',
 
       // Primeira tela ao abrir o app
-      home: const Login(),
+      theme: AppTheme.claro,
+      home: const Dashboard(),
     );
   }
 }
