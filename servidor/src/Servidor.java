@@ -27,6 +27,9 @@ public class Servidor {
         List<Parceiro> clientes = new ArrayList<>();
         AceitadoraDeConexao aceitadora;
 
+        BackendClient backend =
+            new BackendClient("http://localhost:8081");
+
         try {
             aceitadora = new AceitadoraDeConexao(porta, clientes);
             aceitadora.start();
@@ -38,7 +41,7 @@ public class Servidor {
         }
 
         System.out.println("Servidor ativo na porta " + porta);
-        System.out.println("Digite desativar para encerrar.");
+        System.out.println("Comandos disponiveis: status e desativar.");
 
         try (Scanner teclado = new Scanner(System.in)) {
             while (teclado.hasNextLine()) {
@@ -48,9 +51,28 @@ public class Servidor {
                     break;
                 }
 
-                System.out.println(
-                    "Comando invalido. Digite desativar."
-                );
+                if (comando.equalsIgnoreCase("status")) {
+                    try {
+                        String resposta = backend.consultarStatus();
+
+                        System.out.println(
+                            "Resposta do backend: " + resposta
+                        );
+                    } catch (IOException erro) {
+                        System.err.println(
+                            "Nao foi possivel consultar o backend: "
+                                + erro.getMessage()
+                        );
+                    } catch (InterruptedException erro) {
+                        Thread.currentThread().interrupt();
+                        System.err.println("Consulta interrompida.");
+                        break;
+                    }
+                } else {
+                    System.out.println(
+                        "Comando invalido. Digite status ou desativar."
+                    );
+                }
             }
         } finally {
             desligar(aceitadora, clientes);
@@ -73,7 +95,7 @@ public class Servidor {
             );
         }
 
-        // Copia a lista para não bloquear sua atualização durante os envios
+        // Copia a lista para liberar o acesso das outras threads
         List<Parceiro> conectados;
 
         synchronized (clientes) {
