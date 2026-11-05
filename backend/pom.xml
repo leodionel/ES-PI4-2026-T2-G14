@@ -20,11 +20,12 @@
     <version>0.0.1-SNAPSHOT</version>
     <name>talhao</name>
 
+    <!-- Versão do Java -->
     <properties>
         <java.version>17</java.version>
     </properties>
 
-    <!-- Dependências -->
+    <!-- Dependências do projeto -->
     <dependencies>
 
         <!-- Biblioteca para proteger senhas com BCrypt -->
@@ -33,7 +34,7 @@
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
-        <!-- Criação da API REST -->
+        <!-- Criação da API REST com Spring MVC -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
@@ -45,16 +46,16 @@
             <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
 
-        <!-- Validação de dados -->
+        <!-- Validação de dados com Jakarta Validation -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- Testes automatizados com JUnit e Mockito -->
+        <!-- Testes automatizados com JUnit, Mockito e Spring MVC -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
 
