@@ -1,4 +1,5 @@
-﻿name: Compilar Backend Talhao
+﻿
+name: Compilar Backend Talhao
 
 on:
   push:
@@ -25,6 +26,6 @@ jobs:
           cache: maven
           cache-dependency-path: backend/pom.xml
 
-      - name: Compilar backend com Maven
+      - name: Compilar e testar backend com Maven
         working-directory: backend
-        run: mvn -B -DskipTests compile
+        run: mvn -B test
