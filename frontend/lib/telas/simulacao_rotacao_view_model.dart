@@ -2,9 +2,16 @@
 import '../core/base_view_model.dart';
 import '../data/models/talhao_simulacao.dart';
 import '../data/models/cultura_simulacao.dart';
+import '../data/repositories/simulacao_rotacao_repository.dart';
 
-// Responsavel pelo estado da simulacao de rotacao
+// Responsavel pelo estado e pelas acoes da simulacao
 class SimulacaoRotacaoViewModel extends BaseViewModel {
+
+  // Repository responsavel por fornecer os dados
+  final SimulacaoRotacaoRepository _repository;
+
+  // Recebe o Repository pelo construtor
+  SimulacaoRotacaoViewModel(this._repository);
 
   // Lista dos talhoes disponiveis
   List<TalhaoSimulacao> _talhoes = [];
@@ -18,18 +25,18 @@ class SimulacaoRotacaoViewModel extends BaseViewModel {
   // Identificadores das culturas selecionadas
   final Set<String> _culturasSelecionadasIds = {};
 
-  // Quantidade maxima de culturas para comparacao
+  // Limite de culturas para comparacao
   static const int maxCulturas = 3;
 
-  // Permite consultar os talhoes sem modificar a lista
+  // Retorna os talhoes sem permitir alterar a lista
   List<TalhaoSimulacao> get talhoes =>
       List.unmodifiable(_talhoes);
 
-  // Permite consultar as culturas disponiveis
+  // Retorna as culturas disponiveis
   List<CulturaSimulacao> get culturas =>
       List.unmodifiable(_culturas);
 
-  // Retorna o identificador do talhao selecionado
+  // Retorna o ID do talhao selecionado
   String? get talhaoSelecionadoId =>
       _talhaoSelecionadoId;
 
@@ -59,21 +66,40 @@ class SimulacaoRotacaoViewModel extends BaseViewModel {
     return _culturasSelecionadasIds.contains(id);
   }
 
-  // Verifica se atingiu o limite de comparacao
+  // Verifica se atingiu o limite de culturas
   bool get limiteCulturasAtingido =>
       _culturasSelecionadasIds.length >= maxCulturas;
 
-  // Atualiza a lista de talhoes recebida
+  // Solicita ao Repository os dados da simulacao
+  Future<void> carregarDados() {
+
+    // Centraliza os estados de carregamento e erro
+    // utilizando o BaseViewModel do projeto
+    return executar(() async {
+
+      // Busca os talhoes cadastrados
+      final talhoes = await _repository.buscarTalhoes();
+
+      // Busca as culturas disponiveis
+      final culturas = await _repository.buscarCulturas();
+
+      // Atualiza os dados do ViewModel
+      definirTalhoes(talhoes);
+      definirCulturas(culturas);
+    });
+  }
+
+  // Atualiza a lista de talhoes
   void definirTalhoes(List<TalhaoSimulacao> talhoes) {
 
     _talhoes = List.of(talhoes);
 
-    // Mantem o talhao atual se ele continuar disponivel
+    // Verifica se o talhao selecionado ainda existe
     final selecionadoExiste = _talhoes.any(
       (talhao) => talhao.id == _talhaoSelecionadoId,
     );
 
-    // Caso contrario, seleciona o primeiro disponivel
+    // Seleciona o primeiro talhao disponivel
     if (!selecionadoExiste) {
       _talhaoSelecionadoId = _talhoes.isEmpty
           ? null
@@ -83,16 +109,17 @@ class SimulacaoRotacaoViewModel extends BaseViewModel {
     notifyListeners();
   }
 
-  // Atualiza a lista de culturas disponiveis
+  // Atualiza a lista de culturas
   void definirCulturas(List<CulturaSimulacao> culturas) {
 
     _culturas = List.of(culturas);
 
-    // Remove selecoes que nao existem mais na lista
+    // Identifica as culturas disponiveis
     final idsDisponiveis = _culturas
         .map((cultura) => cultura.id)
         .toSet();
 
+    // Remove selecoes que nao existem mais
     _culturasSelecionadasIds.retainAll(idsDisponiveis);
 
     notifyListeners();
@@ -101,11 +128,12 @@ class SimulacaoRotacaoViewModel extends BaseViewModel {
   // Seleciona um talhao pelo identificador
   bool selecionarTalhao(String id) {
 
-    // Impede a selecao de um talhao inexistente
+    // Verifica se o talhao existe
     if (!_talhoes.any((talhao) => talhao.id == id)) {
       return false;
     }
 
+    // Evita atualizar quando ja estiver selecionado
     if (_talhaoSelecionadoId == id) {
       return true;
     }
@@ -120,7 +148,7 @@ class SimulacaoRotacaoViewModel extends BaseViewModel {
   // Adiciona ou remove uma cultura da comparacao
   bool alternarCultura(String id) {
 
-    // Se estiver selecionada, remove
+    // Remove a cultura quando ja estiver selecionada
     if (_culturasSelecionadasIds.contains(id)) {
 
       _culturasSelecionadasIds.remove(id);
@@ -130,7 +158,7 @@ class SimulacaoRotacaoViewModel extends BaseViewModel {
       return true;
     }
 
-    // Impede selecionar mais de tres culturas
+    // Impede ultrapassar o limite de tres culturas
     if (limiteCulturasAtingido) {
       return false;
     }
@@ -140,7 +168,7 @@ class SimulacaoRotacaoViewModel extends BaseViewModel {
       return false;
     }
 
-    // Adiciona a cultura selecionada
+    // Adiciona a cultura
     _culturasSelecionadasIds.add(id);
 
     notifyListeners();
