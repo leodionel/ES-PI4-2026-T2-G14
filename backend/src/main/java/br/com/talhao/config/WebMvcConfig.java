@@ -31,7 +31,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
                 // Rotas de analises de solo
                 "/api/analises-solo",
-                "/api/analises-solo/**"
+                "/api/analises-solo/**",
+
+                // Rotas de relatorios PDF
+                "/api/relatorios",
+                "/api/relatorios/**"
         );
     }
 }
