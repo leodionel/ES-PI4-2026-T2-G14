@@ -20,12 +20,18 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
 
-        // Exige autenticacao nas rotas de propriedades
+        // Exige autenticacao nas rotas protegidas
         registry.addInterceptor(
                 new JwtAuthInterceptor(jwtDecoder)
         ).addPathPatterns(
+
+                // Rotas de propriedades
                 "/api/propriedades",
-                "/api/propriedades/**"
+                "/api/propriedades/**",
+
+                // Rotas de analises de solo
+                "/api/analises-solo",
+                "/api/analises-solo/**"
         );
     }
 }
