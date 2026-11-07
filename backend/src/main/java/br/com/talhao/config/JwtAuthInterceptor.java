@@ -24,10 +24,10 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             HttpServletResponse response,
             Object handler) throws Exception {
 
-        // Recupera o token enviado no cabecalho Authorization
+        // Recupera o cabecalho Authorization
         String authorization = request.getHeader("Authorization");
 
-        // Verifica se o cabecalho usa o formato Bearer
+        // Verifica se foi enviado um token Bearer
         if (authorization == null ||
                 !authorization.startsWith("Bearer ")) {
 
@@ -38,7 +38,7 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        // Extrai o token, removendo o prefixo Bearer
+        // Extrai o token
         String token = authorization.substring(7).trim();
 
         if (token.isEmpty()) {
@@ -50,14 +50,19 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
         }
 
         try {
-            // Valida assinatura e prazo de validade do JWT
+            // Verifica assinatura e expiracao
             Jwt jwt = jwtDecoder.decode(token);
 
-            // Confere se o token foi emitido pela nossa API
-            if (jwt.getIssuer() == null ||
-                    !"talhao-api".equals(jwt.getIssuer().toString()) ||
-                    jwt.getSubject() == null ||
-                    jwt.getSubject().isBlank()) {
+            // Le o emissor diretamente como String
+            String emissor = jwt.getClaimAsString("iss");
+
+            // Recupera o ID do usuario
+            String usuarioId = jwt.getSubject();
+
+            // Verifica se o token pertence a nossa API
+            if (!"talhao-api".equals(emissor) ||
+                    usuarioId == null ||
+                    usuarioId.isBlank()) {
 
                 response.sendError(
                         HttpServletResponse.SC_UNAUTHORIZED,
@@ -66,13 +71,12 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
                 return false;
             }
 
-            // Guarda o ID autenticado para os Controllers
+            // Disponibiliza o ID autenticado aos Controllers
             request.setAttribute(
                     "usuarioIdAutenticado",
-                    jwt.getSubject()
+                    usuarioId
             );
 
-            // Permite que a requisicao continue
             return true;
 
         } catch (JwtException | IllegalArgumentException e) {
