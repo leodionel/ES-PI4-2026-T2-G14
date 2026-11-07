@@ -5,6 +5,7 @@ import java.time.Instant;
 
 import org.junit.jupiter.api.Test;
 
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -40,6 +41,9 @@ class UsuarioControllerTest {
     // Simula o JwtService
     @MockitoBean
     private JwtService jwtService;
+
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
 
     // TESTE 1 - Cadastro deve retornar HTTP 201
     @Test
