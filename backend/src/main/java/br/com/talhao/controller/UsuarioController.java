@@ -10,7 +10,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import br.com.talhao.dto.CadastroUsuarioRequest;
 import br.com.talhao.dto.LoginRequest;
+import br.com.talhao.dto.LoginResponse;
 import br.com.talhao.dto.UsuarioResponse;
+import br.com.talhao.service.JwtService;
 import br.com.talhao.service.UsuarioService;
 
 import jakarta.validation.Valid;
@@ -21,10 +23,15 @@ import jakarta.validation.Valid;
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
+    private final JwtService jwtService;
 
-    // Recebe o Service pelo construtor
-    public UsuarioController(UsuarioService usuarioService) {
+    // Recebe os Services pelo construtor
+    public UsuarioController(
+            UsuarioService usuarioService,
+            JwtService jwtService) {
+
         this.usuarioService = usuarioService;
+        this.jwtService = jwtService;
     }
 
     // Endpoint para cadastrar um novo usuario
@@ -43,13 +50,19 @@ public class UsuarioController {
 
     // Endpoint para realizar o login
     @PostMapping("/login")
-    public ResponseEntity<UsuarioResponse> login(
+    public ResponseEntity<LoginResponse> login(
             @Valid @RequestBody LoginRequest dados) {
 
         // Envia as credenciais para o Service validar
         UsuarioResponse usuario = usuarioService.login(dados);
 
-        // Retorna HTTP 200 e os dados do usuario
-        return ResponseEntity.ok(usuario);
+        // Gera um token JWT usando o ID do usuario autenticado
+        String token = jwtService.gerarToken(usuario.id());
+
+        // Monta a resposta com o token e os dados do usuario
+        LoginResponse resposta = new LoginResponse(token, usuario);
+
+        // Retorna HTTP 200 com o token JWT e os dados do usuario
+        return ResponseEntity.ok(resposta);
     }
 }

@@ -14,10 +14,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import br.com.talhao.dto.CadastroUsuarioRequest;
 import br.com.talhao.dto.LoginRequest;
 import br.com.talhao.dto.UsuarioResponse;
+import br.com.talhao.service.JwtService;
 import br.com.talhao.service.UsuarioService;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -35,6 +37,10 @@ class UsuarioControllerTest {
     @MockitoBean
     private UsuarioService usuarioService;
 
+    // Simula o JwtService
+    @MockitoBean
+    private JwtService jwtService;
+
     // TESTE 1 - Cadastro deve retornar HTTP 201
     @Test
     void deveCadastrarUsuario() throws Exception {
@@ -48,7 +54,7 @@ class UsuarioControllerTest {
                 Instant.now()
         );
 
-        // Simula o retorno do Service
+        // Simula o retorno do UsuarioService
         when(usuarioService.cadastrar(any(CadastroUsuarioRequest.class)))
                 .thenReturn(resposta);
 
@@ -69,10 +75,14 @@ class UsuarioControllerTest {
 
                 // Verifica os dados retornados
                 .andExpect(jsonPath("$.id").value("123"))
+                .andExpect(jsonPath("$.nome").value("Joao"))
                 .andExpect(jsonPath("$.email").value("joao@email.com"));
+
+        // O cadastro nao deve gerar token JWT
+        verifyNoInteractions(jwtService);
     }
 
-    // TESTE 2 - Login deve retornar HTTP 200
+    // TESTE 2 - Login deve retornar HTTP 200 e token JWT
     @Test
     void deveRealizarLogin() throws Exception {
 
@@ -85,9 +95,13 @@ class UsuarioControllerTest {
                 Instant.now()
         );
 
-        // Simula o retorno do Service
+        // Simula a validacao das credenciais
         when(usuarioService.login(any(LoginRequest.class)))
                 .thenReturn(resposta);
+
+        // Simula a geracao do token JWT
+        when(jwtService.gerarToken("123"))
+                .thenReturn("token-jwt-teste");
 
         // Envia uma requisicao POST para login
         mockMvc.perform(post("/api/usuarios/login")
@@ -102,9 +116,17 @@ class UsuarioControllerTest {
                 // Verifica se retornou HTTP 200
                 .andExpect(status().isOk())
 
-                // Verifica os dados retornados
-                .andExpect(jsonPath("$.id").value("123"))
-                .andExpect(jsonPath("$.nome").value("Joao"));
+                // Verifica o token JWT retornado
+                .andExpect(jsonPath("$.token").value("token-jwt-teste"))
+
+                // Verifica os dados do usuario dentro de "usuario"
+                .andExpect(jsonPath("$.usuario.id").value("123"))
+                .andExpect(jsonPath("$.usuario.nome").value("Joao"))
+                .andExpect(jsonPath("$.usuario.email").value("joao@email.com"))
+                .andExpect(jsonPath("$.usuario.telefone").value("19999999999"));
+
+        // Confirma que o token foi solicitado para o usuario correto
+        verify(jwtService).gerarToken("123");
     }
 
     // TESTE 3 - Login com email invalido
@@ -124,8 +146,8 @@ class UsuarioControllerTest {
                 // Espera HTTP 400 - Bad Request
                 .andExpect(status().isBadRequest());
 
-        // O Service nao deve ser chamado
-        verifyNoInteractions(usuarioService);
+        // Nenhum Service deve ser chamado
+        verifyNoInteractions(usuarioService, jwtService);
     }
 
     // TESTE 4 - Login com senha vazia
@@ -145,8 +167,8 @@ class UsuarioControllerTest {
                 // Espera HTTP 400 - Bad Request
                 .andExpect(status().isBadRequest());
 
-        // O Service nao deve ser chamado
-        verifyNoInteractions(usuarioService);
+        // Nenhum Service deve ser chamado
+        verifyNoInteractions(usuarioService, jwtService);
     }
 
     // TESTE 5 - Cadastro sem nome
@@ -168,7 +190,7 @@ class UsuarioControllerTest {
                 // Espera HTTP 400 - Bad Request
                 .andExpect(status().isBadRequest());
 
-        // O Service nao deve ser chamado
-        verifyNoInteractions(usuarioService);
+        // Nenhum Service deve ser chamado
+        verifyNoInteractions(usuarioService, jwtService);
     }
 }
