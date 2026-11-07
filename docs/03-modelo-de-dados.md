@@ -7,12 +7,14 @@
 O MongoDB não guarda esquema: qualquer documento entra em qualquer coleção. O contrato dos dados fica **no código do backend**, como uma classe Java por coleção.
 
 - `record` com `@Document` para coleções; `record` simples para subdocumentos; `enum` para valores fixos (o Spring Data grava enum como texto, sem custo).
+- Um arquivo por classe, com `package` e `import`. Em Java, cada tipo público precisa estar em um arquivo com o mesmo nome.
 - Classes em um pacote `model`, versionadas no Git. Se este documento e as classes divergirem, valem as classes.
 
 ## 2. Decisões de modelagem
 
 1. **O histórico mora dentro do talhão.** Plantios e análises são listas embutidas. A linha do tempo, a simulação, o PDF, o status e a contagem do aviso de exclusão (RF22) leem **um** documento, e excluir o talhão apaga o histórico junto (RN12).
 2. **Só o dado bruto é guardado.** Tudo que dá para calcular fica fora do banco, para nunca ficar desatualizado.
+3. **A propriedade é uma coleção própria ligada ao usuário (RNF08).** No MVP o serviço permite uma por usuário (RN11); não há índice único em usuarioId, para não travar o futuro.
 
 
 
@@ -35,6 +37,8 @@ O MongoDB não guarda esquema: qualquer documento entra em qualquer coleção. O
 |`faixas_solo`|classe de interpretação|`parametro`, `grupoP`, `classe`, `limiteMin`, `limiteMax`, `tratamento`, `fonteId`, `versao`|só `_id`|
 |`regras_rotacao`|regra|`efeito`, `condicao`, `mensagem`, `fonteId`, `escopoRegional`, `statusValidacao`|só `_id`|
 |`fontes_tecnicas`|fonte|`titulo`, `autores`, `instituicao`, `ano`, `url`, `escopoRegional`, `conferencia`|só `_id`|
+
+Todas as consultas de produtor passam por propriedadeId ou _id indexados. Não há consulta que exija índice composto: a lista de talhões é "todos da propriedade", ordenada no servidor.
 
 ## 4. Classes Java
 
