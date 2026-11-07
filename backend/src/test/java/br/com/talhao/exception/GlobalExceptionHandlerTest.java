@@ -31,7 +31,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-// Testa as respostas de erro da API
+// Testes do tratamento global de erros da API
 @WebMvcTest(AnaliseSoloController.class)
 class GlobalExceptionHandlerTest {
 
@@ -42,7 +42,7 @@ class GlobalExceptionHandlerTest {
     @MockitoBean
     private AnaliseSoloService analiseSoloService;
 
-    // Simula a validacao do token JWT
+    // Simula a validacao dos tokens JWT
     @MockitoBean
     private JwtDecoder jwtDecoder;
 
@@ -69,11 +69,11 @@ class GlobalExceptionHandlerTest {
     }
 
     // TESTE 1
-    // Verifica o retorno de HTTP 400 quando o DTO
-    // possui um campo invalido
+    // Deve retornar HTTP 400 para campos invalidos
     @Test
     void deveRetornarErroDeValidacao() throws Exception {
 
+        // pH acima do valor maximo permitido
         String json = """
                 {
                     "propriedadeId": "prop-1",
@@ -96,23 +96,25 @@ class GlobalExceptionHandlerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json)
         )
-                // Confirma o codigo HTTP 400
+                // Confirma o status HTTP 400
                 .andExpect(status().isBadRequest())
 
-                // Confirma o formato atual de erro da API
-                .andExpect(jsonPath("$.erro")
-                        .value("Dados inválidos"))
+                // Confirma o status no JSON
+                .andExpect(jsonPath("$.status").value(400))
+
+                // Confirma o titulo padronizado
+                .andExpect(jsonPath("$.title")
+                        .value("Erro de validacao"))
 
                 // Confirma que o campo ph foi identificado
                 .andExpect(jsonPath("$.campos.ph").exists());
 
-        // Dados invalidos nao devem chegar ao service
+        // Dados invalidos nao chegam ao service
         verifyNoInteractions(analiseSoloService);
     }
 
     // TESTE 2
-    // Verifica o retorno de HTTP 400 quando o JSON
-    // enviado possui sintaxe invalida
+    // Deve retornar HTTP 400 para JSON malformado
     @Test
     void deveRetornarErroParaJsonInvalido() throws Exception {
 
@@ -130,20 +132,25 @@ class GlobalExceptionHandlerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonInvalido)
         )
-                // Confirma o codigo HTTP 400
+                // Confirma o status HTTP 400
                 .andExpect(status().isBadRequest())
 
-                // Confirma que a API retorna uma
-                // mensagem explicando o erro
-                .andExpect(jsonPath("$.erro").isString());
+                // Confirma o status no JSON
+                .andExpect(jsonPath("$.status").value(400))
 
-        // JSON invalido nao deve chegar ao service
+                // Confirma o titulo padronizado
+                .andExpect(jsonPath("$.title")
+                        .value("Requisicao invalida"))
+
+                // Confirma que existe uma mensagem
+                .andExpect(jsonPath("$.detail").isString());
+
+        // JSON invalido nao chega ao service
         verifyNoInteractions(analiseSoloService);
     }
 
     // TESTE 3
-    // Verifica o retorno HTTP 404 quando uma
-    // analise nao existe
+    // Deve retornar HTTP 404 quando a analise nao existe
     @Test
     void deveRetornarErroQuandoAnaliseNaoExiste()
             throws Exception {
@@ -165,12 +172,13 @@ class GlobalExceptionHandlerTest {
                                 "Bearer " + TOKEN
                         )
         )
-                // Confirma o codigo HTTP 404
+                // Confirma o status HTTP 404
                 .andExpect(status().isNotFound())
 
-                // Confirma o status no corpo da resposta
+                // Confirma o status no JSON
                 .andExpect(jsonPath("$.status").value(404));
 
+        // Confirma que o service foi chamado
         verify(analiseSoloService).buscarPorId(
                 "analise-inexistente",
                 "usuario-1"
@@ -178,14 +186,12 @@ class GlobalExceptionHandlerTest {
     }
 
     // TESTE 4
-    // Verifica se erros internos retornam HTTP 500
-    // sem expor informacoes internas ao cliente
+    // Deve retornar HTTP 500 sem expor detalhes internos
     @Test
     void deveOcultarDetalhesDeErroInterno()
             throws Exception {
 
-        // Simula uma falha interna com uma mensagem
-        // que nao deve aparecer na resposta ao Flutter
+        // Simula uma falha interna
         when(analiseSoloService.buscarPorId(
                 "analise-1",
                 "usuario-1"
@@ -202,28 +208,30 @@ class GlobalExceptionHandlerTest {
                                 "Bearer " + TOKEN
                         )
         )
-                // Confirma o codigo HTTP 500
+                // Confirma o status HTTP 500
                 .andExpect(status().isInternalServerError())
 
-                // Confirma a resposta padronizada
+                // Confirma o status no JSON
                 .andExpect(jsonPath("$.status").value(500))
 
+                // Confirma o titulo do erro
                 .andExpect(jsonPath("$.title")
                         .value("Erro interno do servidor"))
 
+                // Confirma a mensagem segura
                 .andExpect(jsonPath("$.detail")
                         .value(
                                 "Ocorreu um erro interno. Tente novamente."
                         ))
 
-                // Impede que a mensagem interna seja
-                // enviada na resposta HTTP
+                // Nao deve revelar detalhes internos
                 .andExpect(content().string(
                         not(containsString(
                                 "segredo-interno-do-servidor"
                         ))
                 ));
 
+        // Confirma que o service foi chamado
         verify(analiseSoloService).buscarPorId(
                 "analise-1",
                 "usuario-1"
