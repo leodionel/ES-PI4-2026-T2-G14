@@ -9,13 +9,15 @@
 
 ## 1. Visão do produto
 
-Sistema web que permite ao pequeno e médio produtor rural registrar o histórico de plantio e as análises de solo de cada talhão, visualizar essa evolução em uma linha do tempo e comparar cenários de rotação de cultura antes de decidir o próximo plantio.
+Aplicativo mobile que permite ao pequeno e médio produtor rural registrar o histórico de plantio e as análises de solo de cada talhão, visualizar essa evolução em uma linha do tempo e comparar cenários de rotação de cultura antes de decidir o próximo plantio.
 
 **Público-alvo:** pequenos e médios produtores rurais, especialmente agricultura familiar, com baixa familiaridade com sistemas agrícolas complexos.
 
 **Foco do MVP:** simplicidade, organização e apoio à decisão.
 
 **Natureza da recomendação:** o sistema oferece apoio à decisão baseado em boas práticas de rotação de culturas. Não substitui o acompanhamento de um engenheiro agrônomo.
+
+**Arquitetura geral**: cliente/servidor. O aplicativo (Flutter) consome uma API REST em Java com Spring Boot, com dados em MongoDB. As decisões do sistema (status do solo e classificação dos cenários) são calculadas no servidor; o aplicativo apenas exibe.
 
 ---
 
@@ -94,7 +96,7 @@ Os parâmetros seguem a análise química de rotina e as classes de interpretaç
 
 - **RN01** — A simulação compara no mínimo 2 e no máximo 3 cenários por vez.
 - **RN02** — O status do solo (saudável, atenção, risco) é calculado a partir da última análise de solo cadastrada, usando as classes de interpretação do Boletim 100 (IAC). Regra proposta: qualquer parâmetro em classe crítica resulta em Risco; qualquer parâmetro em classe de atenção resulta em Atenção; caso contrário, Saudável. Os limites exatos estão em `02-regras-agronomicas.md`.
-- **RN03** — A recomendação não favorece repetir a mesma cultura nem a mesma família botânica da safra anterior.
+- **RN03** — A recomendação não favorece repetir a mesma cultura da safra anterior. A família botânica, por si só, não altera a classificação.
 - **RN04** — A recomendação favorece a alternância entre leguminosas (fixam nitrogênio) e gramíneas.
 - **RN05** — A recomendação considera as duas últimas safras do talhão para evitar sucessão repetitiva de apenas duas culturas.
 - **RN06** — Cada produtor acessa apenas os dados da sua própria propriedade.
@@ -110,8 +112,8 @@ Os parâmetros seguem a análise química de rotina e as classes de interpretaç
 ## 6. Requisitos não funcionais
 
 - **RNF01 — Usabilidade:** interface simples, poucos elementos por tela, botões grandes e textos claros, pensada para usuários com baixa familiaridade digital.
-- **RNF02 — Plataforma:** aplicação web acessível pelos navegadores atuais, com layout que funcione em desktop (prioridade) e em tela de celular.
-- **RNF03 — Segurança:** senhas armazenadas com hash (nunca em texto puro) e rotas protegidas por autenticação.
+- **RNF02 — Plataforma:** aplicativo mobile desenvolvido em Flutter, com layout para tela de celular. A plataforma alvo (Android, iOS ou ambos) está pendente (P1); o alvo provável é Android. O aplicativo se comunica com o servidor por API REST.
+- **RNF03 — Segurança:** senhas armazenadas com hash BCrypt (nunca em texto puro) e rotas protegidas por autenticação com token JWT.
 - **RNF04 — Isolamento de dados:** um usuário não pode acessar dados de outro.
 - **RNF05 — Idioma:** interface em português do Brasil.
 - **RNF06 — Transparência:** o produtor deve conseguir entender por que uma cultura foi recomendada (RF19).

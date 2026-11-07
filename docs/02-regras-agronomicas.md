@@ -242,20 +242,16 @@ Mudanças em relação à versão anterior, com o motivo:
 
 ---
 
-## 9. Estrutura sugerida no banco de dados (issue #3)
+## 9. Estrutura sugerida no banco de dados
 
-- **culturas:** `id`, `nome`, `nome_cientifico`, `familia_botanica`, `grupo` (leguminosa/gramínea/outras), `tipo_uso` (comercial/cobertura), `fixa_nitrogenio`, `grupo_p` (anuais/hortaliças/nulo), `nota`.
-- **faixas_solo:** `id`, `parametro` (pH/V/P/K), `grupo_p` (nulo exceto para P), `classe_fonte`, `limite_min`, `limite_max`, `tratamento` (critica/atencao/sem_alerta), `fonte_id`, `versao`.
-- **regras_rotacao:** `id`, `codigo` (R1 a R7), `condicao`, `efeito`, `mensagem`, `fonte_id` (nulo em regras funcionais, como R7), `escopo_regional`, `status_validacao`.
-- **fontes_tecnicas:** `id`, `codigo` (F1 a F7), `titulo`, `autores`, `instituicao`, `ano`, `url`, `escopo_regional`, `conferencia`.
+A modelagem em coleções e documentos (MongoDB) está em 04-modelo-de-dados.md, que passa a ser a única descrição da estrutura do banco. Este documento define apenas o conteúdo dos dados de referência (culturas na seção 5, faixas na seção 4, regras na seção 6 e fontes na seção 2), que o 04 carrega como dados iniciais.
 
-`status_validacao` assume **validada**, **pendente de validação** ou **não aplicável**. Todas as regras de rotação começam como pendentes.
+Na divergência entre este documento e o 04 quanto à estrutura, vale o 04. Quanto ao conteúdo das regras, faixas e catálogo, vale este documento.
 
 ---
 
 ## 10. Checklist de validação
 
-- [ ] Conferir no livro oficial do Boletim 100 (3ª edição) as tabelas de pH, V%, P e K, com os números de página.
 - [ ] Confirmar a tabela de K da edição 2022 (hoje conferida só na edição anterior).
 - [ ] Abrir e ler F4, F5, F6 e F7 e confirmar que sustentam as regras citadas.
 - [ ] Confirmar com o grupo as decisões D1 a D5.
