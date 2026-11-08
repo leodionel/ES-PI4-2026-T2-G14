@@ -1,3 +1,6 @@
-﻿{
-  "java.project.sourcePaths": ["servidor/src"]
+{
+  "java.project.sourcePaths": [
+    "servidor/src"
+  ],
+  "java.configuration.updateBuildConfiguration": "interactive"
 }
