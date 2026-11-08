@@ -1,3 +1,4 @@
+
 package br.com.talhao.model;
 
 import java.time.LocalDate;
@@ -6,41 +7,98 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-//Representa uma analise de solo cadastrada no MongoDB
-@Document (collection = "analises_solo")
+// Representa uma analise de solo cadastrada no MongoDB
+@Document(collection = "analises_solo")
 public record AnaliseSolo(
 
-    //Identificador unico da analise
-    @Id 
-    String id,
+        // Identificador da analise
+        @Id
+        String id,
 
-    //Usuario responsavel pela analise 
-    @Indexed 
-    String usuarioId,
+        // Usuario responsavel
+        @Indexed
+        String usuarioId,
 
-    //Propriedade onde a analise foi realizada
-    @Indexed 
-    String propriedadeId,
+        // Propriedade vinculada
+        @Indexed
+        String propriedadeId,
 
-    //Talhao relacionado a analise
-    String talhaoId,
+        // Talhao relacionado
+        String talhaoId,
 
-    //Data em que o solo foi coletado
-    LocalDate dataColeta,
+        // Data da coleta
+        LocalDate dataColeta,
 
-    //Potencial hidrogenionico do solo
-    Double ph,
+        // Indicadores do solo
+        Double ph,
+        Double fosforo,
+        Double potassio,
+        Double materiaOrganica,
 
-    //Quantidade de fosforo
-    Double fosforo,
+        // Informacoes adicionais
+        String observacoes,
 
-    //Quantidade de potassio 
-    Double potassio,
+        // Campos do modelo de historico de talhoes
+        String analiseId,
+        LocalDate data,
+        Double saturacao
 
-    //Teor de materia organica
-    Double materiaOrganica,
-
-    //Informacoes adicionais da analise
-    String observacoes
 ) {
+
+    // Mantem compatibilidade com a API de analises de solo
+    public AnaliseSolo(
+            String id,
+            String usuarioId,
+            String propriedadeId,
+            String talhaoId,
+            LocalDate dataColeta,
+            Double ph,
+            Double fosforo,
+            Double potassio,
+            Double materiaOrganica,
+            String observacoes) {
+
+        this(
+                id,
+                usuarioId,
+                propriedadeId,
+                talhaoId,
+                dataColeta,
+                ph,
+                fosforo,
+                potassio,
+                materiaOrganica,
+                observacoes,
+                null,
+                null,
+                null
+        );
+    }
+
+    // Mantem compatibilidade com o modelo original da main
+    public AnaliseSolo(
+            String analiseId,
+            LocalDate data,
+            double ph,
+            double fosforo,
+            double potassio,
+            double saturacao,
+            Double materiaOrganica) {
+
+        this(
+                null,
+                null,
+                null,
+                null,
+                data,
+                ph,
+                fosforo,
+                potassio,
+                materiaOrganica,
+                null,
+                analiseId,
+                data,
+                saturacao
+        );
+    }
 }
