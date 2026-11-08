@@ -67,7 +67,7 @@ class DashboardScreen extends StatelessWidget {
                     children: [
                       _buildKpiCard('Área total', '128,4 ha', '4 Talhões cadastrados'),
                       const SizedBox(width: 16),
-                      _buildKpiCard('Talhões saudáveis', '2', '50% da propriedade', textColor: corVerdeVerdeClaro),
+                      _buildKpiCard('Talhões saudáveis', '2', '50% da propriedade', textColor: corVerdeClaro),
                       const SizedBox(width: 16),
                       _buildKpiCard('Em atenção', '1', 'Nitrogênio baixo', textColor: Colors.orange),
                       const SizedBox(width: 16),
