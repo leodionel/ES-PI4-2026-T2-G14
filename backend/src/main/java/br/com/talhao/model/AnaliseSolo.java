@@ -45,7 +45,7 @@ public record AnaliseSolo(
 
 ) {
 
-    // Mantem compatibilidade com a API de analises de solo
+    // Construtor utilizado pela API de analises de solo
     public AnaliseSolo(
             String id,
             String usuarioId,
@@ -75,7 +75,8 @@ public record AnaliseSolo(
         );
     }
 
-    // Mantem compatibilidade com o modelo original da main
+    // Construtor utilizado pelo historico de talhoes
+    // com materia organica
     public AnaliseSolo(
             String analiseId,
             LocalDate data,
@@ -99,6 +100,27 @@ public record AnaliseSolo(
                 analiseId,
                 data,
                 saturacao
+        );
+    }
+
+    // Construtor utilizado pelos testes do TalhaoService
+    // quando nao ha materia organica informada
+    public AnaliseSolo(
+            String analiseId,
+            LocalDate data,
+            double ph,
+            double fosforo,
+            double potassio,
+            double saturacao) {
+
+        this(
+                analiseId,
+                data,
+                ph,
+                fosforo,
+                potassio,
+                saturacao,
+                null
         );
     }
 }
