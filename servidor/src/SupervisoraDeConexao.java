@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.List;
 
-// Atende as mensagens de cada cliente conectado
+// Responsavel por atender cada cliente conectado ao servidor
 public class SupervisoraDeConexao extends Thread {
 
     private final Socket conexao;
@@ -24,7 +24,7 @@ public class SupervisoraDeConexao extends Thread {
         this.conexao = conexao;
         this.clientes = clientes;
 
-        // Cliente HTTP que se comunica com o Spring Boot
+        // Cliente HTTP utilizado para consultar o Spring Boot
         this.backend = new BackendClient(
                 "http://localhost:8081"
         );
@@ -33,10 +33,10 @@ public class SupervisoraDeConexao extends Thread {
     @Override
     public void run() {
 
-        // Fecha automaticamente a conexao ao terminar
         try (Socket socket = conexao;
              Parceiro cliente = new Parceiro(socket)) {
 
+            // Registra o cliente conectado
             synchronized (clientes) {
                 clientes.add(cliente);
             }
@@ -50,7 +50,7 @@ public class SupervisoraDeConexao extends Thread {
                 atender(cliente);
             } finally {
 
-                // Remove o cliente da lista ao desconectar
+                // Remove o cliente ao encerrar a conexao
                 synchronized (clientes) {
                     clientes.remove(cliente);
                 }
@@ -70,7 +70,7 @@ public class SupervisoraDeConexao extends Thread {
         }
     }
 
-    // Recebe e processa as mensagens enviadas pelo cliente
+    // Recebe e identifica os pedidos do cliente
     private void atender(Parceiro cliente)
             throws IOException, ClassNotFoundException {
 
@@ -78,7 +78,7 @@ public class SupervisoraDeConexao extends Thread {
 
             Comunicado comunicado = cliente.receber();
 
-            // PEDIDO 1 - Encerrar conexao
+            // PEDIDO 1 - Encerrar a conexao
             if (comunicado instanceof PedidoParaSair) {
 
                 System.out.println(
@@ -96,27 +96,46 @@ public class SupervisoraDeConexao extends Thread {
                 );
 
                 consultarStatus(cliente);
+
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+
                 continue;
             }
 
-            // Impede processamento de mensagens desconhecidas
+            // PEDIDO 3 - Consultar propriedades ou analises
+            if (comunicado instanceof PedidoDeConsulta pedido) {
+
+                System.out.println(
+                    "Cliente solicitou uma consulta autenticada."
+                );
+
+                consultarDados(cliente, pedido);
+
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+
+                continue;
+            }
+
+            // Mensagem desconhecida
             throw new IOException(
-                "Tipo de pedido ainda nao suportado: "
+                "Tipo de pedido nao suportado: "
                 + comunicado.getClass().getSimpleName()
             );
         }
     }
 
-    // Consulta o Spring Boot e envia a resposta pelo socket
+    // Consulta o status do Spring Boot
     private void consultarStatus(Parceiro cliente)
             throws IOException {
 
         try {
 
-            // Consulta o endpoint GET /status
             String resposta = backend.consultarStatus();
 
-            // Devolve o resultado para o cliente conectado
             cliente.enviar(
                 new RespostaDeStatus(
                     true,
@@ -125,7 +144,7 @@ public class SupervisoraDeConexao extends Thread {
             );
 
             System.out.println(
-                "Status do backend enviado ao cliente."
+                "Status enviado ao cliente."
             );
 
         } catch (InterruptedException erro) {
@@ -135,18 +154,17 @@ public class SupervisoraDeConexao extends Thread {
             cliente.enviar(
                 new RespostaDeStatus(
                     false,
-                    "Consulta ao backend interrompida."
+                    "Consulta interrompida."
                 )
             );
 
         } catch (IOException erro) {
 
             System.err.println(
-                "Erro ao consultar o backend: "
+                "Falha ao consultar status: "
                 + erro.getMessage()
             );
 
-            // Informa a falha sem encerrar a conexao
             cliente.enviar(
                 new RespostaDeStatus(
                     false,
@@ -154,5 +172,103 @@ public class SupervisoraDeConexao extends Thread {
                 )
             );
         }
+    }
+
+    // Consulta propriedades ou analises usando JWT
+    private void consultarDados(
+            Parceiro cliente,
+            PedidoDeConsulta pedido) throws IOException {
+
+        // Verifica se o pedido possui um tipo valido
+        if (pedido.getTipo() == null) {
+
+            cliente.enviar(
+                new RespostaDeConsulta(
+                    false,
+                    "Tipo de consulta invalido."
+                )
+            );
+
+            return;
+        }
+
+        String resposta;
+
+        try {
+
+            // Identifica qual endpoint do Spring Boot consultar
+            switch (pedido.getTipo()) {
+
+                case PROPRIEDADES:
+
+                    resposta = backend.consultarPropriedades(
+                        pedido.getTokenJwt()
+                    );
+
+                    break;
+
+                case ANALISES_SOLO:
+
+                    resposta = backend.consultarAnalisesSolo(
+                        pedido.getTokenJwt()
+                    );
+
+                    break;
+
+                default:
+
+                    cliente.enviar(
+                        new RespostaDeConsulta(
+                            false,
+                            "Consulta nao suportada."
+                        )
+                    );
+
+                    return;
+            }
+
+        } catch (InterruptedException erro) {
+
+            Thread.currentThread().interrupt();
+
+            cliente.enviar(
+                new RespostaDeConsulta(
+                    false,
+                    "Consulta interrompida."
+                )
+            );
+
+            return;
+
+        } catch (IOException | IllegalArgumentException erro) {
+
+            // Registra a falha sem exibir o token JWT
+            System.err.println(
+                "Falha na consulta autenticada: "
+                + erro.getMessage()
+            );
+
+            cliente.enviar(
+                new RespostaDeConsulta(
+                    false,
+                    "Nao foi possivel realizar a consulta. "
+                    + "Verifique a autenticacao e a disponibilidade do backend."
+                )
+            );
+
+            return;
+        }
+
+        // Retorna o JSON recebido do Spring Boot
+        cliente.enviar(
+            new RespostaDeConsulta(
+                true,
+                resposta
+            )
+        );
+
+        System.out.println(
+            "Resultado da consulta enviado ao cliente."
+        );
     }
 }
