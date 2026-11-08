@@ -1,23 +1,29 @@
+
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
 
-// Recebe novas conexões de clientes
+// Recebe novas conexoes de clientes
 public class AceitadoraDeConexao extends Thread
         implements AutoCloseable {
 
     private final ServerSocket servidor;
     private final List<Parceiro> clientes;
 
+    private volatile boolean encerrando = false;
+
     public AceitadoraDeConexao(
             int porta,
             List<Parceiro> clientes) throws IOException {
 
+        // Verifica se a porta informada e valida
         if (porta < 1 || porta > 65535) {
             throw new IllegalArgumentException("Porta invalida.");
         }
 
+        // Verifica se a lista de clientes existe
         if (clientes == null) {
             throw new IllegalArgumentException(
                 "Lista de clientes ausente."
@@ -25,24 +31,44 @@ public class AceitadoraDeConexao extends Thread
         }
 
         this.clientes = clientes;
-        this.servidor = new ServerSocket(porta);
+
+        // Permite conexoes somente deste computador
+        InetAddress enderecoLocal =
+                InetAddress.getByName("127.0.0.1");
+
+        // Abre a porta TCP apenas na interface local
+        this.servidor = new ServerSocket(
+                porta,
+                50,
+                enderecoLocal
+        );
     }
 
     @Override
     public void run() {
-        // Fecha a porta quando a thread termina
+
+        // Fecha a porta quando a thread terminar
         try (ServerSocket escuta = servidor) {
+
             while (!escuta.isClosed()) {
-                // Aguarda até um cliente se conectar
+
+                // Aguarda a conexao de um cliente local
                 Socket conexao = escuta.accept();
 
                 try {
+
+                    // Cria uma thread para atender o cliente
                     SupervisoraDeConexao supervisora =
-                        new SupervisoraDeConexao(conexao, clientes);
+                            new SupervisoraDeConexao(
+                                    conexao,
+                                    clientes
+                            );
 
                     supervisora.start();
+
                 } catch (RuntimeException erro) {
-                    // Evita deixar uma conexão sem atendimento
+
+                    // Fecha a conexao caso ocorra uma falha
                     try {
                         conexao.close();
                     } catch (IOException erroAoFechar) {
@@ -52,21 +78,23 @@ public class AceitadoraDeConexao extends Thread
                     throw erro;
                 }
             }
+
         } catch (IOException erro) {
-            // Fechar o servidor também interrompe o accept()
+
+            // O fechamento normal tambem interrompe accept()
             if (!encerrando) {
                 System.err.println(
-                    "Erro ao receber conexao: " + erro.getMessage()
+                    "Erro ao receber conexao: "
+                    + erro.getMessage()
                 );
             }
         }
     }
 
-    private volatile boolean encerrando = false;
-
-    // Para de aceitar novos clientes
+    // Para de aceitar novas conexoes
     @Override
     public void close() throws IOException {
+
         encerrando = true;
         servidor.close();
     }

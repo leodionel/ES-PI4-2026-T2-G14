@@ -1,0 +1,31 @@
+﻿
+name: Compilar Backend Talhao
+
+on:
+  push:
+    branches:
+      - feat-servidor-java
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar codigo do repositorio
+        uses: actions/checkout@v7
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Compilar e testar backend com Maven
+        working-directory: backend
+        run: mvn -B test
