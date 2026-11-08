@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../core/utils/pdf_export_service.dart';
 
 class ProntuarioScreen extends StatelessWidget {
   ProntuarioScreen({super.key});
@@ -76,9 +76,11 @@ class ProntuarioScreen extends StatelessWidget {
                   Row(
                     children: [
                       OutlinedButton(
-                        onPressed: () {},
+                        onPressed: () async {
+                          await PdfExportService.exportarProntuarioTalhao();
+                        },
                         style: OutlinedButton.styleFrom(
-                          side: BorderRadius.circular(8) != null ? BorderSide(color: Colors.black54) : null,
+                          side: const BorderSide(color: Colors.black54),
                           foregroundColor: Colors.black87,
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
