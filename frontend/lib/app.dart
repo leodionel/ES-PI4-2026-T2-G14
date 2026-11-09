@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 // Tela de login
 import 'telas/login.dart';
+import 'telas/simulacao_rotacao.dart';
 
 // Configuração principal do app
 class App extends StatelessWidget {
@@ -14,6 +15,8 @@ class App extends StatelessWidget {
       debugShowCheckedModeBanner: false,
 
       title: 'Prontuário Digital do Talhão',
+
+      routes: {'/simulacao-rotacao': (_) => const SimulacaoRotacao()},
 
       // Primeira tela ao abrir o app
       home: const Login(),
