@@ -85,6 +85,11 @@ public class TalhaoService {
         return paraResponse(talhaoDoUsuario(id, usuarioId));
     }
 
+    // BUSCAR O TALHAO COMPLETO (USADO POR OUTROS SERVICES)
+    public Talhao buscarEntidade(String id, String usuarioId) {
+        return talhaoDoUsuario(id, usuarioId);
+    }
+
     // EDITAR NOME E AREA DE UM TALHAO
     public TalhaoResponse atualizar(
             String id,
