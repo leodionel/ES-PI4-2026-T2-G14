@@ -16,21 +16,21 @@ backend/src/main/
 │   ├── service/      regras de negócio
 │   ├── repository/   acesso ao MongoDB
 │   ├── dto/          objetos de entrada e saída da API
-│   ├── config/       CORS, JWT e carga dos dados de referência
+│   ├── config/       JWT, interceptor e carga dos dados de referência
 │   └── model/        classes do banco
 └── resources/
-    ├── application.properties
-    └── seed/         dados de referência em JSON
+    └── application.properties
 ```
 
 Princípios do modelo:
 
-- O histórico do talhão (plantios e análises) fica dentro do documento do talhão. A linha do tempo, a simulação, o PDF e o status leem um único documento, e excluir o talhão remove o histórico junto.
+- Os plantios ficam dentro do documento do talhão: são poucos por talhão e sempre lidos junto com ele. As análises de solo ficam em coleção própria (`analises_solo`), ligadas ao talhão por `talhaoId`. O status do solo usa só a última análise, e o PDF e a linha do tempo leem a lista por talhão.
+- Excluir um talhão remove também as análises dele. O serviço de talhões faz essa remoção.
 - O banco guarda só o dado bruto. Status do solo, cultura atual e última análise são calculados na leitura. A cultura atual é o plantio mais recente sem `dataColheita`.
-- As listas `plantios` e `analises` são ordenadas por data pelo serviço ao ler, não pelo banco.
+- A lista `plantios` é ordenada por data pelo serviço ao ler. As análises são consultadas já ordenadas por `dataColeta`.
 - A propriedade é uma coleção própria ligada ao usuário. Cada usuário tem uma única propriedade (RN11), regra verificada no serviço. Uma propriedade só pode ser excluída se não tiver talhões; caso contrário, a API responde 409.
-- Os dados de referência (culturas, faixas de solo, regras e fontes) ficam em coleções carregadas por seed na inicialização e mantidas em memória pelo backend.
-- O MongoDB não tem chave estrangeira. O serviço valida o `culturaId` contra o catálogo antes de gravar um plantio.
+- Os dados de referência (culturas, faixas de solo, regras e fontes) ficam em coleções carregadas na inicialização e mantidas em memória pelo backend.
+- O MongoDB não tem chave estrangeira. O serviço valida o `culturaId` contra o catálogo antes de gravar um plantio e valida, antes de gravar uma análise, que o talhão existe e pertence à propriedade do usuário.
 
 ## 2. Coleções
 
@@ -38,8 +38,9 @@ Princípios do modelo:
 |---|---|---|---|
 | `usuarios` | Produtor | `nome`, `email`, `telefone`, `senhaHash`, `criadoEm` | `email` único |
 | `propriedades` | Propriedade | `usuarioId`, `nome`, `localizacao` | `usuarioId` |
-| `talhoes` | Talhão e histórico | `propriedadeId`, `nome`, `areaHa`, `criadoEm`, `plantios[]`, `analises[]` | `propriedadeId` |
-| `culturas` | Catálogo de culturas | `nome`, `nomeCientifico`, `familia`, `grupo`, `tipoUso`, `grupoP`, `nota` | `_id` |
+| `talhoes` | Talhão e plantios | `propriedadeId`, `nome`, `areaHa`, `criadoEm`, `plantios[]` | `propriedadeId` |
+| `analises_solo` | Análise de solo | `usuarioId`, `propriedadeId`, `talhaoId`, `dataColeta`, `ph`, `fosforo`, `potassio`, `saturacaoBases`, `observacoes` | `usuarioId`, `propriedadeId`, (`talhaoId`, `dataColeta`) |
+| `culturas` | Catálogo de culturas | `nome`, `nomeCientifico`, `familia`, `grupo`, `tipoUso`, `grupoP` | `_id` |
 | `faixas_solo` | Classes de interpretação do solo | `parametro`, `grupoP`, `classe`, `limiteMin`, `limiteMax`, `tratamento`, `fonteId` | `_id` |
 | `regras_rotacao` | Regras de rotação | `efeito`, `mensagem`, `fonteIds` | `_id` |
 | `fontes_tecnicas` | Fontes técnicas | `titulo`, `autores`, `instituicao`, `ano`, `url`, `escopoRegional` | `_id` |
@@ -60,15 +61,25 @@ Exemplo de documento da coleção `talhoes` (o plantio aberto não tem o campo `
       dataPlantio: ISODate("2025-03-10T00:00:00Z"), dataColheita: ISODate("2025-08-02T00:00:00Z") },
     { plantioId: "665f20bb8b3a4d0012ab3502", culturaId: "soja",
       dataPlantio: ISODate("2025-11-15T00:00:00Z") }
-  ],
-  analises: [
-    { analiseId: "665f20cc8b3a4d0012ab3601", data: ISODate("2026-01-10T00:00:00Z"),
-      ph: 5.3, fosforo: 30, potassio: 2.0, v: 55 }
   ]
 }
 ```
 
-Só o `_id` é um `ObjectId`. Os demais identificadores (`propriedadeId`, `usuarioId`, `plantioId`, `analiseId`, `culturaId`) são texto.
+Exemplo de documento da coleção `analises_solo`:
+
+```js
+{
+  _id: ObjectId("665f20cc8b3a4d0012ab3601"),
+  usuarioId: "665f19ff8b3a4d0012ab33ff",
+  propriedadeId: "665f1a118b3a4d0012ab3400",
+  talhaoId: "665f1c2e8b3a4d0012ab34cd",
+  dataColeta: ISODate("2026-01-10T00:00:00Z"),
+  ph: 5.3, fosforo: 30, potassio: 2.0, saturacaoBases: 55,
+  observacoes: "Amostra de 0 a 20 cm"
+}
+```
+
+Só o `_id` é um `ObjectId`. Os demais identificadores (`propriedadeId`, `usuarioId`, `talhaoId`, `plantioId`, `culturaId`) são texto.
 
 ## 3. Classes Java
 
@@ -168,12 +179,10 @@ public record Talhao(
         String nome,
         double areaHa,
         Instant criadoEm,
-        List<Plantio> plantios,
-        List<AnaliseSolo> analises) {
+        List<Plantio> plantios) {
 
     public Talhao {
         plantios = plantios == null ? List.of() : plantios;
-        analises = analises == null ? List.of() : analises;
     }
 }
 ```
@@ -194,11 +203,27 @@ package br.com.talhao.model;
 
 import java.time.LocalDate;
 
-public record AnaliseSolo(String analiseId, LocalDate data,
-                          double ph, double fosforo, double potassio, double v) {}
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Document(collection = "analises_solo")
+@CompoundIndex(name = "talhao_data", def = "{'talhaoId': 1, 'dataColeta': -1}")
+public record AnaliseSolo(
+        @Id String id,
+        @Indexed String usuarioId,
+        @Indexed String propriedadeId,
+        String talhaoId,
+        LocalDate dataColeta,
+        Double ph,                  // CaCl2
+        Double fosforo,             // P resina, mg/dm³
+        Double potassio,            // K, mmolc/dm³
+        Double saturacaoBases,      // V, %
+        String observacoes) {}
 ```
 
-O construtor compacto de `Talhao` evita listas nulas, o que faria o `$push` falhar. O `plantioId` e o `analiseId` são gerados pelo servidor com `new ObjectId().toHexString()`.
+O construtor compacto de `Talhao` evita lista nula, o que faria o `$push` falhar. O `plantioId` é gerado pelo servidor com `new ObjectId().toHexString()`.
 
 ### 3.3. Dados de referência
 
@@ -217,8 +242,7 @@ public record Cultura(
         String familia,
         Grupo grupo,
         TipoUso tipoUso,
-        GrupoP grupoP,                  // nulo para cultura de cobertura
-        String nota) {}
+        GrupoP grupoP) {}               // nulo para cultura de cobertura
 ```
 
 ```java
@@ -285,9 +309,6 @@ Criteria dono = Criteria.where("id").is(talhaoId).and("propriedadeId").is(propri
 // registrar plantio
 mongo.updateFirst(Query.query(dono), new Update().push("plantios", novoPlantio), Talhao.class);
 
-// registrar análise
-mongo.updateFirst(Query.query(dono), new Update().push("analises", novaAnalise), Talhao.class);
-
 // registrar colheita (somente de plantio ainda aberto)
 Query aberto = Query.query(new Criteria().andOperator(
         dono,
@@ -295,14 +316,19 @@ Query aberto = Query.query(new Criteria().andOperator(
                 Criteria.where("plantioId").is(plantioId).and("dataColheita").is(null))));
 mongo.updateFirst(aberto, new Update().set("plantios.$.dataColheita", data), Talhao.class);
 
-// excluir talhão e histórico
+// excluir talhão e, em seguida, as análises dele
 mongo.remove(Query.query(dono), Talhao.class);
+analiseSoloRepository.deleteByTalhaoId(talhaoId);
 ```
 
 Respostas de erro:
 
-- Registrar plantio ou análise, e excluir: se `getMatchedCount()` (ou `getDeletedCount()`) for 0, o talhão não existe ou não é do usuário, e a resposta é 404.
+- Registrar plantio e excluir: se `getMatchedCount()` (ou `getDeletedCount()`) for 0, o talhão não existe ou não é do usuário, e a resposta é 404.
 - Registrar colheita: o serviço primeiro busca o talhão do dono (404 se não existir) e confere que o plantio existe, que está aberto e que a data não é anterior à `dataPlantio`; falhas de regra respondem 409 ou 400. Só então faz o `update`. O filtro por plantio aberto no `update` impede que dois pedidos simultâneos fechem o mesmo plantio; se `getMatchedCount()` for 0 nesse ponto, a resposta é 409.
+
+- Registrar ou editar análise: o serviço confere que a propriedade é do usuário e que o talhão existe nessa propriedade (404 se não existir).
+- Cadastrar propriedade: se o usuário já tem uma, a resposta é 409 (RN11).
+- Excluir propriedade: se ela ainda tem talhões, a resposta é 409.
 
 O banco não valida datas nem referências, então essas checagens ficam no serviço.
 
@@ -326,6 +352,6 @@ As tabelas do documento `02` usam `<`, `≤` e `>`. No banco, cada classe usa li
 - **Banco da equipe:** MongoDB Atlas, com a URI na variável de ambiente `MONGODB_URI`. Credenciais não vão para o Git.
 - **Índices:** `spring.data.mongodb.auto-index-creation=true`, necessário para o índice único do e-mail.
 - **Fuso horário:** a JVM usa UTC (`TimeZone.setDefault(TimeZone.getTimeZone("UTC"))` antes do `SpringApplication.run`), para que as datas sem hora não mudem de dia entre ambientes.
-- **Dados de referência:** na inicialização, o backend grava cada item dos arquivos de `seed/` por `_id` (grava ou substitui) e depois os carrega em memória. Reiniciar não duplica dados.
+- **Dados de referência:** na inicialização, uma classe Java (`ApplicationRunner`) grava cada item por `_id` (grava ou substitui), e o backend os mantém em memória. Reiniciar não duplica dados.
 - **Senha:** o banco guarda apenas o hash BCrypt, que nunca sai nas respostas da API.
 - **Testes:** os testes que gravam no banco usam um banco separado do de desenvolvimento.

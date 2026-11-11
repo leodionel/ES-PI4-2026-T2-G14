@@ -87,8 +87,8 @@ Grupo Hortaliças (batata):
 
 | Classe | Faixa (mg/dm³) | Tratamento |
 |---|---|---|
-| Baixo | < 25 | Atenção |
-| Médio | 25 a 60 | Sem alerta |
+| Baixo | 0 a 25 | Atenção |
+| Médio | 26 a 60 | Sem alerta |
 | Alto | > 60 | Sem alerta |
 
 O grupo usado é o da cultura comercial mais recente do talhão. Se o histórico não tem cultura comercial, o fósforo não entra no status e o sistema informa isso.
