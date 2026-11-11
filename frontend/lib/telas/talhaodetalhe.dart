@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'pdf_export_service.dart';
+
+import '../core/utils/pdf_export_service.dart';
 import 'culturas_safras_screen.dart';
 import 'analise_solo_screen.dart';
-import 'simulacao_rotacao_screen.dart';
+import 'simulacao_rotacao.dart';
 
 class ProntuarioScreen extends StatelessWidget {
   const ProntuarioScreen({super.key});
@@ -196,7 +197,7 @@ class ProntuarioScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 32),
 
-                  // CARDS DE ANÁLISE DO SOLO (Boletim 100 IAC - Seção 4 do MVP)
+                  // CARDS DE ANÁLISE DO SOLO
                   Row(
                     children: [
                       Expanded(
@@ -286,7 +287,7 @@ class ProntuarioScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 24),
 
-                              // BOTÃO SIMULAR NOVO CENÁRIO CONECTADO À TELA #20
+                              // BOTÃO PARA ABRIR A SIMULAÇÃO DE ROTAÇÃO
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton(
@@ -295,9 +296,7 @@ class ProntuarioScreen extends StatelessWidget {
                                       context,
                                       MaterialPageRoute(
                                         builder: (_) =>
-                                            const SimulacaoRotacaoScreen(
-                                              talhaoInicialId: '04',
-                                            ),
+                                            const SimulacaoRotacao(),
                                       ),
                                     );
                                   },
@@ -377,7 +376,7 @@ class ProntuarioScreen extends StatelessWidget {
     );
   }
 
-  // --- WIDGETS AUXILIARES ---
+  // WIDGETS AUXILIARES
 
   Widget _buildSidebar(BuildContext context) {
     return Container(
@@ -414,10 +413,7 @@ class ProntuarioScreen extends StatelessWidget {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      const SimulacaoRotacaoScreen(talhaoInicialId: '04'),
-                ),
+                MaterialPageRoute(builder: (_) => const SimulacaoRotacao()),
               );
             },
           ),

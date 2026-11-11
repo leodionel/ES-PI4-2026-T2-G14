@@ -32,7 +32,7 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
       TextEditingController();
 
   // Histórico de laudos exibido na tela (O status vem calculado pelo Backend - Seção 2 / RN02)
-  final List> _laudosCadastrados = [
+  final List<Map<String, String>> _laudosCadastrados = [
     {
       'data': '10/01/2026',
       'ph': '5,6',
