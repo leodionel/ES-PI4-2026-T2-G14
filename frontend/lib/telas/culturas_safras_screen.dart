@@ -24,7 +24,7 @@ class _CulturasSafrasScreenState extends State<CulturasSafrasScreen> {
   final _formKey = GlobalKey<FormState>();
 
   // Catálogo oficial de culturas (RF10 / RN04)
-  final List> _catalogoCulturas = [
+  final List<Map<String, String>> _catalogoCulturas = [
     {'nome': 'Soja', 'grupo': 'Leguminosa'},
     {'nome': 'Feijão', 'grupo': 'Leguminosa'},
     {'nome': 'Milho', 'grupo': 'Gramínea'},
@@ -40,7 +40,7 @@ class _CulturasSafrasScreenState extends State<CulturasSafrasScreen> {
   bool _jaColhida = false;
 
   // Lista simulando o histórico cronológico vindo do Backend (RF13 / RN05)
-  final List> _historicoSafras = [
+  final List<Map<String, String?>> _historicoSafras = [
     {
       'cultura': 'Soja',
       'grupo': 'Leguminosa',
@@ -504,7 +504,9 @@ class _CulturasSafrasScreenState extends State<CulturasSafrasScreen> {
                               ),
                               const SizedBox(height: 20),
 
-                              ...List.generate(_historicoSafras.length, (index) {
+                              ...List.generate(_historicoSafras.length, (
+                                index,
+                              ) {
                                 final safra = _historicoSafras[index];
                                 final bool emAndamento =
                                     safra['dataColheita'] == null;
@@ -534,7 +536,7 @@ class _CulturasSafrasScreenState extends State<CulturasSafrasScreen> {
                                           Row(
                                             children: [
                                               Text(
-                                                safra['cultura'],
+                                                safra['cultura'] ?? '',
                                                 style: TextStyle(
                                                   fontSize: 18,
                                                   fontWeight: FontWeight.bold,
@@ -554,7 +556,7 @@ class _CulturasSafrasScreenState extends State<CulturasSafrasScreen> {
                                                       BorderRadius.circular(12),
                                                 ),
                                                 child: Text(
-                                                  safra['grupo'],
+                                                  safra['grupo'] ?? '',
                                                   style: const TextStyle(
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.bold,
