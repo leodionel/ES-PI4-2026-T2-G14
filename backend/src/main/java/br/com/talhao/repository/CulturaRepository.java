@@ -1,5 +1,12 @@
 package br.com.talhao.repository;
 
-public class CulturaRepository {
-    
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
+
+import br.com.talhao.model.cultura.Cultura;
+
+// Responsavel pelo acesso a colecao "culturas" do MongoDB
+@Repository
+public interface CulturaRepository
+        extends MongoRepository<Cultura, String> {
 }
