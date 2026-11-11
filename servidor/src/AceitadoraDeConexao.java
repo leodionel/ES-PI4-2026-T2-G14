@@ -34,7 +34,9 @@ public class AceitadoraDeConexao extends Thread
 
         // Permite conexoes somente deste computador
         InetAddress enderecoLocal =
-                InetAddress.getByName("127.0.0.1");
+                InetAddress.getByName(
+                    System.getenv().getOrDefault("BIND_ADDRESS", "127.0.0.1")
+                );
 
         // Abre a porta TCP apenas na interface local
         this.servidor = new ServerSocket(
