@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 // Tela de login
 import 'telas/login.dart';
+import 'core/theme/app_theme.dart';
 
 // Configuração principal do app
 class App extends StatelessWidget {
@@ -17,6 +18,7 @@ class App extends StatelessWidget {
 
       // Primeira tela ao abrir o app
       home: const Login(),
+      theme: AppTheme.claro,
     );
   }
 }
