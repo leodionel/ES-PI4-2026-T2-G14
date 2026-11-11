@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../core/utils/pdf_export_service.dart';
+import 'pdf_export_service.dart';
 import 'culturas_safras_screen.dart';
 import 'analise_solo_screen.dart';
+import 'simulacao_rotacao_screen.dart';
 
 class ProntuarioScreen extends StatelessWidget {
   const ProntuarioScreen({super.key});
@@ -19,7 +20,7 @@ class ProntuarioScreen extends StatelessWidget {
       body: Row(
         children: [
           // MENU LATERAL (SIDEBAR)
-          _buildSidebar(),
+          _buildSidebar(context),
 
           // CONTEÚDO PRINCIPAL
           Expanded(
@@ -284,10 +285,22 @@ class ProntuarioScreen extends StatelessWidget {
                                 Colors.redAccent,
                               ),
                               const SizedBox(height: 24),
+
+                              // BOTÃO SIMULAR NOVO CENÁRIO CONECTADO À TELA #20
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton(
-                                  onPressed: () {},
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const SimulacaoRotacaoScreen(
+                                              talhaoInicialId: '04',
+                                            ),
+                                      ),
+                                    );
+                                  },
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: corVerdeClaro,
                                     foregroundColor: Colors.white,
@@ -366,7 +379,7 @@ class ProntuarioScreen extends StatelessWidget {
 
   // --- WIDGETS AUXILIARES ---
 
-  Widget _buildSidebar() {
+  Widget _buildSidebar(BuildContext context) {
     return Container(
       width: 250,
       color: corCard,
@@ -395,7 +408,19 @@ class ProntuarioScreen extends StatelessWidget {
           const SizedBox(height: 16),
           _buildMenuItem(Icons.dashboard, 'Dashboard'),
           _buildMenuItem(Icons.layers, 'Talhões', isActive: true),
-          _buildMenuItem(Icons.autorenew, 'Simulação de Rotação'),
+          _buildMenuItem(
+            Icons.autorenew,
+            'Simulação de Rotação',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const SimulacaoRotacaoScreen(talhaoInicialId: '04'),
+                ),
+              );
+            },
+          ),
           _buildMenuItem(Icons.person, 'Perfil'),
           const Spacer(),
           Container(
@@ -427,7 +452,12 @@ class ProntuarioScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String title, {bool isActive = false}) {
+  Widget _buildMenuItem(
+    IconData icon,
+    String title, {
+    bool isActive = false,
+    VoidCallback? onTap,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -443,7 +473,7 @@ class ProntuarioScreen extends StatelessWidget {
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
           ),
         ),
-        onTap: () {},
+        onTap: onTap ?? () {},
       ),
     );
   }

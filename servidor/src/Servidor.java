@@ -28,7 +28,9 @@ public class Servidor {
         AceitadoraDeConexao aceitadora;
 
         BackendClient backend =
-            new BackendClient("http://localhost:8081");
+            new BackendClient(
+                System.getenv().getOrDefault("BACKEND_URL", "http://localhost:8081")
+            );
 
         try {
             aceitadora = new AceitadoraDeConexao(porta, clientes);
