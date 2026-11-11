@@ -1,4 +1,6 @@
 import '../core/utils/pdf_export_service.dart';
+import 'culturas_safras_screen.dart';
+import 'analise_solo_screen.dart';
 
 class ProntuarioScreen extends StatelessWidget {
   ProntuarioScreen({super.key});
