@@ -97,8 +97,9 @@ Todos os campos são obrigatórios. O nitrogênio e a matéria orgânica não fa
 - **RN08** Toda regra de recomendação tem uma fonte técnica registrada.
 - **RN09** Quando o histórico é insuficiente para aplicar uma regra, a justificativa informa isso.
 - **RN10** Quando nenhum cenário se destaca, o sistema informa que as opções são equivalentes.
-- **RN11** No MVP, cada produtor tem uma única propriedade.
-- **RN12** Excluir um talhão remove definitivamente o histórico dele.
+- **RN11** No MVP, cada produtor tem uma única propriedade. Uma propriedade só pode ser excluída depois que todos os talhões dela forem excluídos.
+- **RN12** Excluir um talhão remove definitivamente o histórico dele (safras e análises).
+- **RN13** Toda análise de solo pertence a um talhão da propriedade do usuário.
 
 ## 7. Requisitos não funcionais
 
