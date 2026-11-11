@@ -14,7 +14,7 @@ class App extends StatelessWidget {
       // Tira a faixa de debug do canto
       debugShowCheckedModeBanner: false,
 
-      title: 'Prontuário Digital do Talhão',
+      title: 'Pay4 · Prontuário Digital do Talhão',
 
       // Primeira tela ao abrir o app
       home: const Login(),
