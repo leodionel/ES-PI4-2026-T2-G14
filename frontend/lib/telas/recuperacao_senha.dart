@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../core/app_textos.dart';
 import '../core/theme/app_colors.dart';
+import '../core/utils/validators.dart';
 import '../core/widgets/app_button.dart';
 import '../core/widgets/app_text_field.dart';
-import '../core/utils/validators.dart';
+import '../core/widgets/auth_layout.dart';
 
-// Tela de recuperação de senha do produtor.
 class RecuperacaoSenha extends StatefulWidget {
   const RecuperacaoSenha({
     super.key,
@@ -14,7 +14,6 @@ class RecuperacaoSenha extends StatefulWidget {
     this.aoVoltar,
   });
 
-  // A ação real será fornecida pela integração com o backend.
   final Future<void> Function(String email)? aoSolicitarRecuperacao;
   final VoidCallback? aoVoltar;
 
@@ -30,7 +29,6 @@ class _RecuperacaoSenhaState extends State<RecuperacaoSenha> {
   bool _concluido = false;
   String? _erro;
 
-  // Valida o e-mail e solicita a recuperação.
   Future<void> _enviarLink() async {
     if (_carregando || _concluido) return;
 
@@ -44,7 +42,6 @@ class _RecuperacaoSenhaState extends State<RecuperacaoSenha> {
 
     final solicitar = widget.aoSolicitarRecuperacao;
 
-    // Não informa envio realizado sem integração real.
     if (solicitar == null) {
       setState(() {
         _erro =
@@ -83,7 +80,6 @@ class _RecuperacaoSenhaState extends State<RecuperacaoSenha> {
     }
   }
 
-  // Retorna para a tela anterior.
   void _voltar() {
     if (widget.aoVoltar != null) {
       widget.aoVoltar!();
@@ -103,155 +99,143 @@ class _RecuperacaoSenhaState extends State<RecuperacaoSenha> {
 
   @override
   Widget build(BuildContext context) {
-    final textos = Theme.of(context).textTheme;
+    return AuthLayout(
+      titulo: 'Recupere seu acesso',
+      descricao:
+          'Esqueceu a senha? Informe o e-mail da sua '
+          'conta para solicitar a recuperação.',
+      icone: Icons.mark_email_read_outlined,
+      etiqueta: 'RECUPERAÇÃO DE SENHA',
+      conteudo: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Campo de e-mail.
+            AppTextField(
+              controller: _emailController,
+              rotulo: AppTextos.email,
+              dica: AppTextos.emailExemplo,
+              validator: Validators.email,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.email],
+              enabled: !_carregando && !_concluido,
+              onFieldSubmitted: (_) {
+                _enviarLink();
+              },
+            ),
 
-    return Scaffold(
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight > 48
-                      ? constraints.maxHeight - 48
-                      : 0,
-                ),
-                child: Center(
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 440),
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: AppColors.painel,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Nome e ícone do aplicativo.
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.eco_outlined,
-                                color: AppColors.verdeEscuro,
-                                size: 32,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  AppTextos.nomeApp,
-                                  style: textos.titleLarge,
-                                ),
-                              ),
-                            ],
-                          ),
+            const SizedBox(height: 24),
 
-                          const SizedBox(height: 32),
-
-                          Text(
-                            'Esqueceu sua senha?',
-                            style: textos.headlineMedium,
-                          ),
-
-                          const SizedBox(height: 8),
-
-                          Text(
-                            'Digite seu e-mail cadastrado '
-                            'para solicitar a recuperação de senha.',
-                            style: textos.bodySmall,
-                          ),
-
-                          const SizedBox(height: 32),
-
-                          // Campo de e-mail.
-                          AppTextField(
-                            controller: _emailController,
-                            rotulo: AppTextos.email,
-                            dica: AppTextos.emailExemplo,
-                            validator: Validators.email,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.done,
-                            enabled: !_carregando && !_concluido,
-                            autofillHints: const [AutofillHints.email],
-                            onFieldSubmitted: (_) {
-                              _enviarLink();
-                            },
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // Mensagem de erro.
-                          if (_erro != null) ...[
-                            Semantics(
-                              liveRegion: true,
-                              child: Text(
-                                _erro!,
-                                style: textos.bodyMedium?.copyWith(
-                                  color: AppColors.terracota,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-
-                          // Confirmação somente após resposta real.
-                          if (_concluido) ...[
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: AppColors.fundo,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppColors.verde),
-                              ),
-                              child: const Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    Icons.check_circle_outline,
-                                    color: AppColors.verdeEscuro,
-                                  ),
-                                  SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      'Solicitação recebida. '
-                                      'Se houver uma conta para '
-                                      'este e-mail, siga as '
-                                      'instruções enviadas.',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-
-                          // Botão com estado de carregamento.
-                          AppButton(
-                            texto: 'Enviar link de recuperação',
-                            textoCarregando: 'Enviando...',
-                            carregando: _carregando,
-                            onPressed: _concluido ? null : _enviarLink,
-                          ),
-
-                          const SizedBox(height: 32),
-
-                          // Voltar ao login.
-                          TextButton.icon(
-                            onPressed: _voltar,
-                            icon: const Icon(Icons.arrow_back),
-                            label: const Text('Voltar para o login'),
-                          ),
-                        ],
-                      ),
-                    ),
+            // Mensagem de erro.
+            if (_erro != null) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF0E9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.terracota.withValues(alpha: 0.35),
                   ),
                 ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.error_outline, color: AppColors.terracota),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          _erro!,
+                          style: const TextStyle(
+                            color: AppColors.terracota,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            );
-          },
+              const SizedBox(height: 18),
+            ],
+
+            // Confirmação após resposta bem-sucedida.
+            if (_concluido) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEDF4E6),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.verde),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline,
+                      color: AppColors.verdeEscuro,
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Solicitação recebida. '
+                        'Se houver uma conta para '
+                        'este e-mail, siga as '
+                        'instruções enviadas.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.5,
+                          color: AppColors.verdeEscuro,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+            ],
+
+            // Enviar solicitação.
+            AppButton(
+              texto: 'Enviar link de recuperação',
+              textoCarregando: 'Enviando...',
+              carregando: _carregando,
+              onPressed: _concluido ? null : _enviarLink,
+            ),
+
+            const SizedBox(height: 20),
+
+            // Retornar ao login.
+            OutlinedButton.icon(
+              onPressed: _voltar,
+              icon: const Icon(Icons.arrow_back, size: 18),
+              label: const Text('Voltar para o login'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.verdeEscuro,
+                minimumSize: const Size(double.infinity, 50),
+                side: const BorderSide(color: AppColors.borda),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            const Center(
+              child: Text(
+                'Prontuário Digital do Talhão',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textoSecundario,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
