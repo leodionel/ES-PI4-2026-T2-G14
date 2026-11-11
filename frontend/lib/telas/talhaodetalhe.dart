@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../core/utils/pdf_export_service.dart';
+import 'pdf_export_service.dart';
 import 'culturas_safras_screen.dart';
 import 'analise_solo_screen.dart';
 import 'simulacao_rotacao_screen.dart';
