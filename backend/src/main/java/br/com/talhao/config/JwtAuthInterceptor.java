@@ -24,6 +24,12 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             HttpServletResponse response,
             Object handler) throws Exception {
 
+        // Permite requisicoes OPTIONS (preflight CORS)
+        // sem exigir um token JWT
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
         // Recupera o cabecalho Authorization
         String authorization = request.getHeader("Authorization");
 
