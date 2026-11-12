@@ -39,6 +39,7 @@ dependencies:
   provider: 6.1.5+1
   http: 1.6.0
   flutter_secure_storage: 11.2.0
+  image: 4.10.2
 
 dev_dependencies:
   flutter_test:
