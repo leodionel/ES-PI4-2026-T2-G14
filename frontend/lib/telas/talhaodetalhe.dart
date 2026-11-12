@@ -1,577 +1,531 @@
 import 'package:flutter/material.dart';
-import 'pdf_export_service.dart';
-import 'culturas_safras_screen.dart';
-import 'analise_solo_screen.dart';
-import 'simulacao_rotacao_screen.dart';
 
-class ProntuarioScreen extends StatelessWidget {
-  const ProntuarioScreen({super.key});
+import '../data/services/api_client.dart';
+import '../data/services/token_storage.dart';
 
-  // Paleta de cores baseada no design
-  final Color corFundo = const Color(0xFFF7F5EE);
-  final Color corCard = const Color(0xFFF0EBE1);
-  final Color corVerdeEscuro = const Color(0xFF4A5D23);
-  final Color corVerdeClaro = const Color(0xFF8DA259);
+// Prontuário de um talhão com dados da API Java
+class ProntuarioScreen extends StatefulWidget {
+  const ProntuarioScreen({super.key, this.talhaoId});
 
+  // Opcional para manter compatibilidade com rotas antigas
+  final String? talhaoId;
+
+  @override
+  State<ProntuarioScreen> createState() => _ProntuarioScreenState();
+}
+
+class _ProntuarioScreenState extends State<ProntuarioScreen> {
+  static const corFundo = Color(0xFFF7F5EE);
+  static const corCard = Color(0xFFF0EBE1);
+  static const corVerdeEscuro = Color(0xFF4A5D23);
+  static const corVerdeClaro = Color(0xFF8DA259);
+
+  final ApiClient _api = ApiClient();
+  final TokenStorage _tokenStorage = TokenStorage();
+
+  Map<String, dynamic>? _talhao;
+  List<Map<String, dynamic>> _analises = [];
+
+  bool _carregando = true;
+  String? _erro;
+  String? _erroAnalises;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarDados();
+  }
+
+  // RECUPERAR TOKEN JWT
+  Future<String> _obterToken() async {
+    final token = await _tokenStorage.lerToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Sessão expirada. Faça login novamente.');
+    }
+
+    return token;
+  }
+
+  // CARREGAR DETALHES REAIS DO TALHÃO
+  Future<void> _carregarDados() async {
+    final id = widget.talhaoId?.trim();
+
+    if (id == null || id.isEmpty) {
+      setState(() {
+        _carregando = false;
+        _erro = 'Selecione um talhão na lista para abrir o prontuário.';
+      });
+      return;
+    }
+
+    setState(() {
+      _carregando = true;
+      _erro = null;
+      _erroAnalises = null;
+    });
+
+    try {
+      final token = await _obterToken();
+
+      // GET /api/talhoes/{id}
+      final resposta = await _api.get(
+        '/api/talhoes/${Uri.encodeComponent(id)}',
+        token: token,
+      );
+
+      if (resposta is! Map) {
+        throw const FormatException('A API não retornou os dados do talhão.');
+      }
+
+      final detalhe = Map<String, dynamic>.from(resposta);
+
+      // Buscar análises de solo reais
+      List<Map<String, dynamic>> analises = [];
+      String? erroAnalises;
+
+      try {
+        final retorno = await _api.get('/api/analises-solo', token: token);
+
+        if (retorno is! List) {
+          throw const FormatException(
+            'A API não retornou a lista de análises.',
+          );
+        }
+
+        // Mostrar apenas análises deste talhão
+        analises = retorno
+            .map((item) => Map<String, dynamic>.from(item as Map))
+            .where((item) => item['talhaoId']?.toString() == id)
+            .toList();
+
+        // Ordenar da análise mais recente para a antiga
+        analises.sort(
+          (a, b) => (b['dataColeta'] ?? '').toString().compareTo(
+            (a['dataColeta'] ?? '').toString(),
+          ),
+        );
+      } catch (e) {
+        erroAnalises = e.toString().replaceFirst('Exception: ', '');
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _talhao = detalhe;
+        _analises = analises;
+        _erroAnalises = erroAnalises;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _erro = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _carregando = false;
+        });
+      }
+    }
+  }
+
+  // FORMATAR TEXTO
+  String _texto(dynamic valor, {String vazio = 'Não informado'}) {
+    if (valor == null || valor.toString().trim().isEmpty) {
+      return vazio;
+    }
+
+    return valor.toString();
+  }
+
+  // FORMATAR NÚMERO
+  String _numero(dynamic valor) {
+    if (valor == null) {
+      return 'Não informado';
+    }
+
+    if (valor is num) {
+      final casas = valor == valor.roundToDouble() ? 0 : 2;
+
+      return valor.toStringAsFixed(casas).replaceAll('.', ',');
+    }
+
+    return valor.toString().replaceAll('.', ',');
+  }
+
+  // FORMATAR DATA
+  String _data(dynamic valor) {
+    final texto = valor?.toString();
+
+    if (texto == null || texto.isEmpty) {
+      return 'Não informada';
+    }
+
+    final data = DateTime.tryParse(texto);
+
+    if (data == null) {
+      return texto;
+    }
+
+    final dia = data.day.toString().padLeft(2, '0');
+    final mes = data.month.toString().padLeft(2, '0');
+    final ano = data.year;
+
+    return '$dia/$mes/$ano';
+  }
+
+  // RECUPERAR QUANTIDADE DA API
+  int _quantidade(String campo) {
+    final valor = _talhao?[campo];
+
+    if (valor is int) {
+      return valor;
+    }
+
+    return int.tryParse(valor?.toString() ?? '') ?? 0;
+  }
+
+  // EXIBIR INFORMAÇÕES SOBRE PLANTIOS
+  void _mostrarPlantios() {
+    final total = _quantidade('totalPlantios');
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Plantios do talhão'),
+        content: Text(
+          total == 0
+              ? 'Nenhum plantio registrado neste talhão. '
+                    'O cadastro e o histórico de plantios '
+                    'ainda precisam ser integrados à API.'
+              : 'A API informa $total plantio(s) '
+                    'neste talhão, mas ainda não disponibiliza '
+                    'o histórico detalhado por este endpoint.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+            },
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // EXIBIR ANÁLISES DE SOLO REAIS
+  void _mostrarAnalises() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Análises de solo do talhão'),
+        content: SizedBox(
+          width: 540,
+          height: 360,
+          child: _erroAnalises != null
+              ? Center(
+                  child: Text(
+                    'Falha ao carregar análises: '
+                    '$_erroAnalises',
+                  ),
+                )
+              : _analises.isEmpty
+              ? const Center(child: Text('Nenhuma análise de solo cadastrada.'))
+              : ListView.separated(
+                  itemCount: _analises.length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final analise = _analises[index];
+
+                    return ListTile(
+                      leading: const Icon(Icons.science_outlined),
+                      title: Text(
+                        'Coleta: '
+                        '${_data(analise['dataColeta'])}',
+                      ),
+                      subtitle: Text(
+                        'pH: ${_numero(analise['ph'])} • '
+                        'Fósforo: ${_numero(analise['fosforo'])}\n'
+                        'Potássio: ${_numero(analise['potassio'])} • '
+                        'Matéria orgânica: '
+                        '${_numero(analise['materiaOrganica'])}',
+                      ),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+            },
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // CARD DE INFORMAÇÃO
+  Widget _cartao(String titulo, String valor, IconData icone) {
+    return SizedBox(
+      width: 245,
+      child: Card(
+        color: corCard,
+        elevation: 0,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icone, color: corVerdeEscuro),
+              const SizedBox(height: 12),
+              Text(titulo, style: const TextStyle(color: Colors.black54)),
+              const SizedBox(height: 8),
+              Text(
+                valor,
+                style: const TextStyle(
+                  color: corVerdeEscuro,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // LINHA DE INFORMAÇÕES
+  Widget _linha(String rotulo, String valor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(child: Text(rotulo)),
+          Flexible(
+            child: Text(
+              valor,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // INTERFACE PRINCIPAL
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: corFundo,
-      body: Row(
-        children: [
-          // MENU LATERAL (SIDEBAR)
-          _buildSidebar(context),
 
-          // CONTEÚDO PRINCIPAL
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: ListView(
-                children: [
-                  // CABEÇALHO COM BOTÃO DE VOLTAR
-                  InkWell(
-                    onTap: () => Navigator.maybePop(context),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.arrow_back, size: 16, color: Colors.black54),
-                        SizedBox(width: 4),
-                        Text(
-                          'Voltar para Talhões',
-                          style: TextStyle(color: Colors.black54),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Talhões / Talhão 04',
-                    style: TextStyle(color: Colors.black45, fontSize: 12),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // TÍTULO E STATUS
-                  Row(
-                    children: [
-                      Text(
-                        'Talhão 04 - Soja',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: corVerdeEscuro,
-                          fontFamily: 'Serif',
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: corVerdeClaro.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.circle, size: 8, color: corVerdeEscuro),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Saudável',
-                              style: TextStyle(
-                                color: corVerdeEscuro,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '42,8 hectares  •  Última análise de solo em 10/01/2026',
-                    style: TextStyle(fontSize: 16, color: Colors.black54),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // BOTÕES DE AÇÃO (PDF + NOVO REGISTRO)
-                  Row(
-                    children: [
-                      OutlinedButton(
-                        onPressed: () async {
-                          await PdfExportService.exportarProntuarioTalhao();
-                        },
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.black54),
-                          foregroundColor: Colors.black87,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          'Exportar Prontuário PDF',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              backgroundColor: const Color(0xFFF7F5EE),
-                              title: const Text(
-                                'Novo Registro no Talhão',
-                                style: TextStyle(
-                                  color: Color(0xFF4A5D23),
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Serif',
-                                ),
-                              ),
-                              content: const Text(
-                                'Selecione o tipo de informação que deseja registrar:',
-                              ),
-                              actions: [
-                                ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF8DA259),
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  icon: const Icon(Icons.grass),
-                                  label: const Text('Cultura / Safra'),
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const CulturasSafrasScreen(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF4A5D23),
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  icon: const Icon(Icons.science),
-                                  label: const Text('Análise de Solo'),
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const AnaliseSoloScreen(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.add),
-                        label: const Text('Novo Registro'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: corVerdeClaro,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-
-                  // CARDS DE ANÁLISE DO SOLO (Boletim 100 IAC - Seção 4 do MVP)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildSoloCard(
-                          'pH (CaCl₂)',
-                          '5,6',
-                          'Faixa adequada',
-                          corVerdeEscuro,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildSoloCard(
-                          'Fósforo (P resina)',
-                          '18 mg/dm³',
-                          'Teor adequado',
-                          corVerdeEscuro,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildSoloCard(
-                          'Potássio (K)',
-                          '2,4 mmolc/dm³',
-                          'Teor adequado',
-                          corVerdeEscuro,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildSoloCard(
-                          'Saturação (V%)',
-                          '65%',
-                          'Laudo de 10/01/2026',
-                          corVerdeEscuro,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Nota (RN02): O status "Saudável" indica apenas que nenhum dos 4 indicadores avaliados acendeu alerta no último laudo.',
-                    style: TextStyle(fontSize: 12, color: Colors.black54),
-                  ),
-                  const SizedBox(height: 28),
-
-                  // SEÇÃO INFERIOR: SIMULAÇÃO E RESUMO
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // SIMULAÇÃO DE ROTAÇÃO
-                      Expanded(
-                        flex: 5,
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: corCard,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Simulação de Rotação',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: corVerdeEscuro,
-                                ),
-                              ),
-                              const Text(
-                                'Última comparação de cenários feita para este talhão',
-                                style: TextStyle(color: Colors.black54),
-                              ),
-                              const SizedBox(height: 24),
-                              _buildSimulacaoItem(
-                                'Recomendado',
-                                'Milho (Gramínea) — favorece a alternância após Soja (Leguminosa) (RN04).',
-                                corVerdeClaro,
-                              ),
-                              const SizedBox(height: 16),
-                              _buildSimulacaoItem(
-                                'Não recomendado',
-                                'Soja — repetir a mesma cultura da safra anterior não é recomendado (RN03).',
-                                Colors.redAccent,
-                              ),
-                              const SizedBox(height: 24),
-
-                              // BOTÃO SIMULAR NOVO CENÁRIO CONECTADO À TELA #20
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const SimulacaoRotacaoScreen(
-                                              talhaoInicialId: '04',
-                                            ),
-                                      ),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: corVerdeClaro,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 16,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Simular novo cenário',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-
-                      // RESUMO DO TALHÃO
-                      Expanded(
-                        flex: 4,
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: corCard,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Resumo do talhão',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: corVerdeEscuro,
-                                ),
-                              ),
-                              const Text(
-                                'Dados gerais cadastrados',
-                                style: TextStyle(color: Colors.black54),
-                              ),
-                              const SizedBox(height: 24),
-                              _buildResumoRow('Área', '42,8 ha'),
-                              const SizedBox(height: 16),
-                              _buildResumoRow('Cultura atual', 'Soja'),
-                              const SizedBox(height: 16),
-                              _buildResumoRow('Cultura anterior', 'Milho'),
-                              const SizedBox(height: 16),
-                              _buildResumoRow(
-                                'Status do solo',
-                                'Saudável',
-                                valueColor: corVerdeEscuro,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+      appBar: AppBar(
+        backgroundColor: corCard,
+        title: const Text('Prontuário do Talhão'),
+        actions: [
+          IconButton(
+            onPressed: _carregando ? null : _carregarDados,
+            tooltip: 'Atualizar dados',
+            icon: const Icon(Icons.refresh),
           ),
         ],
       ),
+
+      body: _carregando
+          ? const Center(child: CircularProgressIndicator())
+          : _erro != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_erro!, textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: _carregarDados,
+                      child: const Text('Tentar novamente'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : _conteudo(),
     );
   }
 
-  // --- WIDGETS AUXILIARES ---
+  // CONTEÚDO DO PRONTUÁRIO
+  Widget _conteudo() {
+    final talhao = _talhao!;
 
-  Widget _buildSidebar(BuildContext context) {
-    return Container(
-      width: 250,
-      color: corCard,
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Prontuário Digital\ndo Talhão',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: corVerdeEscuro,
-              fontFamily: 'Serif',
+    final nome = _texto(talhao['nome'], vazio: 'Talhão sem nome');
+
+    final ultimaAnalise = _analises.isNotEmpty ? _analises.first : null;
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1100),
+        child: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            TextButton.icon(
+              onPressed: () {
+                Navigator.maybePop(context);
+              },
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Voltar para Talhões'),
             ),
-          ),
-          const SizedBox(height: 40),
-          const Text(
-            'GESTÃO DA FAZENDA',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
+
+            const SizedBox(height: 12),
+
+            Text(
+              nome,
+              style: const TextStyle(
+                fontSize: 32,
+                color: corVerdeEscuro,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          _buildMenuItem(Icons.dashboard, 'Dashboard'),
-          _buildMenuItem(Icons.layers, 'Talhões', isActive: true),
-          _buildMenuItem(
-            Icons.autorenew,
-            'Simulação de Rotação',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      const SimulacaoRotacaoScreen(talhaoInicialId: '04'),
-                ),
-              );
-            },
-          ),
-          _buildMenuItem(Icons.person, 'Perfil'),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white54,
-              borderRadius: BorderRadius.circular(8),
+
+            const SizedBox(height: 8),
+
+            Text(
+              '${_numero(talhao['areaHa'])} hectares • '
+              'Cadastrado em '
+              '${_data(talhao['criadoEm'])}',
+              style: const TextStyle(fontSize: 15, color: Colors.black54),
             ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+
+            const SizedBox(height: 24),
+
+            // CARDS COM DADOS REAIS
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
               children: [
-                Text(
-                  'Área monitorada',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                _cartao(
+                  'Área cadastrada',
+                  '${_numero(talhao['areaHa'])} ha',
+                  Icons.landscape,
                 ),
-                Text(
-                  '128,4 ha',
-                  style: TextStyle(fontSize: 20, color: Colors.black87),
+                _cartao(
+                  'Plantios no prontuário',
+                  '${_quantidade('totalPlantios')}',
+                  Icons.grass,
                 ),
-                Text(
-                  '4 talhões cadastrados',
-                  style: TextStyle(fontSize: 10, color: Colors.black54),
+                _cartao(
+                  'Análises no prontuário',
+                  '${_quantidade('totalAnalises')}',
+                  Icons.analytics_outlined,
+                ),
+                _cartao(
+                  'Laudos de solo',
+                  _erroAnalises == null
+                      ? '${_analises.length}'
+                      : 'Indisponível',
+                  Icons.science_outlined,
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildMenuItem(
-    IconData icon,
-    String title, {
-    bool isActive = false,
-    VoidCallback? onTap,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: isActive ? Colors.white : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: isActive ? corVerdeEscuro : Colors.black54),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: isActive ? corVerdeEscuro : Colors.black87,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-        onTap: onTap ?? () {},
-      ),
-    );
-  }
+            const SizedBox(height: 28),
 
-  Widget _buildSoloCard(
-    String titulo,
-    String valor,
-    String subtitulo,
-    Color tagColor,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: corCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            titulo,
-            style: const TextStyle(fontSize: 14, color: Colors.black87),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            valor,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(subtitulo, style: TextStyle(fontSize: 12, color: tagColor)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSimulacaoItem(String tag, String texto, Color tagColor) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border.all(color: tagColor.withOpacity(0.5)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: tagColor.withOpacity(0.25),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              tag,
-              style: TextStyle(
-                color: tagColor == Colors.redAccent
-                    ? Colors.red.shade900
-                    : corVerdeEscuro,
+            Text(
+              'Histórico e registros',
+              style: const TextStyle(
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
-                fontSize: 12,
+                color: corVerdeEscuro,
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            texto,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildResumoRow(String label, String value, {Color? valueColor}) {
-    return Container(
-      padding: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.black87)),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: valueColor ?? Colors.black87,
+            const SizedBox(height: 10),
+
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _mostrarPlantios,
+                  icon: const Icon(Icons.grass),
+                  label: const Text('Ver plantios'),
+                ),
+                FilledButton.icon(
+                  onPressed: _mostrarAnalises,
+                  style: FilledButton.styleFrom(backgroundColor: corVerdeClaro),
+                  icon: const Icon(Icons.science_outlined),
+                  label: const Text('Ver análises de solo'),
+                ),
+              ],
             ),
-          ),
-        ],
+
+            const SizedBox(height: 28),
+
+            // ÚLTIMA ANÁLISE DE SOLO
+            Card(
+              color: corCard,
+              elevation: 0,
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Última análise de solo',
+                      style: TextStyle(
+                        color: corVerdeEscuro,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    if (_erroAnalises != null)
+                      Text(
+                        'Não foi possível consultar '
+                        'as análises: $_erroAnalises',
+                      )
+                    else if (ultimaAnalise == null)
+                      const Text(
+                        'Ainda não existe análise de solo '
+                        'cadastrada para este talhão.',
+                      )
+                    else ...[
+                      _linha(
+                        'Data da coleta',
+                        _data(ultimaAnalise['dataColeta']),
+                      ),
+                      _linha('pH', _numero(ultimaAnalise['ph'])),
+                      _linha('Fósforo', _numero(ultimaAnalise['fosforo'])),
+                      _linha('Potássio', _numero(ultimaAnalise['potassio'])),
+                      _linha(
+                        'Matéria orgânica',
+                        _numero(ultimaAnalise['materiaOrganica']),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            const Text(
+              'O status agronômico não é exibido porque '
+              'a resposta atual da API não fornece uma '
+              'classificação calculada. Nenhuma recomendação '
+              'ou indicador foi inventado.',
+              style: TextStyle(fontSize: 12, color: Colors.black54),
+            ),
+          ],
+        ),
       ),
     );
   }

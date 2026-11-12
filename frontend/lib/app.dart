@@ -1,24 +1,61 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-// Tela de login
-import 'telas/login.dart';
 import 'core/theme/app_theme.dart';
+import 'data/repositories/auth_repository.dart';
+import 'telas/dashboard_screen.dart';
+import 'telas/login.dart';
+import 'telas/recuperacao_senha.dart';
 
-// Configuração principal do app
 class App extends StatelessWidget {
   const App({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      // Tira a faixa de debug do canto
       debugShowCheckedModeBanner: false,
-
-      title: 'Pay4 · Prontuário Digital do Talhão',
-
-      // Primeira tela ao abrir o app
-      home: const Login(),
+      title: 'Prontuário Digital do Talhão',
       theme: AppTheme.claro,
+      home: Consumer<AuthRepository>(
+        builder: (context, auth, child) {
+          // Verifica se existe uma sessão JWT salva.
+          if (auth.iniciando) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          // Login realizado: abre o dashboard.
+          if (auth.autenticado) {
+            return Scaffold(
+              appBar: AppBar(
+                title: const Text('Prontuário Digital do Talhão'),
+                actions: [
+                  TextButton.icon(
+                    onPressed: () async {
+                      await auth.sair();
+                    },
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Sair'),
+                  ),
+                ],
+              ),
+              body: const DashboardScreen(),
+            );
+          }
+
+          // Usuário não autenticado: abre o login.
+          return Login(
+            aoRecuperarSenha: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const RecuperacaoSenha(),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
