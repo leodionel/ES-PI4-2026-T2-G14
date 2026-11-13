@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../data/services/api_client.dart';
 import '../data/services/token_storage.dart';
+import 'analise_solo_screen.dart';
 
-// Prontuário de um talhão com dados da API Java
 class ProntuarioScreen extends StatefulWidget {
   const ProntuarioScreen({super.key, this.talhaoId});
 
-  // Opcional para manter compatibilidade com rotas antigas
   final String? talhaoId;
 
   @override
@@ -36,7 +35,6 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
     _carregarDados();
   }
 
-  // RECUPERAR TOKEN JWT
   Future<String> _obterToken() async {
     final token = await _tokenStorage.lerToken();
 
@@ -47,14 +45,16 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
     return token;
   }
 
-  // CARREGAR DETALHES REAIS DO TALHÃO
+  // CARREGAR TALHÃO E SUAS ANÁLISES REAIS
   Future<void> _carregarDados() async {
     final id = widget.talhaoId?.trim();
 
     if (id == null || id.isEmpty) {
       setState(() {
         _carregando = false;
-        _erro = 'Selecione um talhão na lista para abrir o prontuário.';
+        _erro =
+            'Selecione um talhão na lista '
+            'para abrir o prontuário.';
       });
       return;
     }
@@ -68,7 +68,6 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
     try {
       final token = await _obterToken();
 
-      // GET /api/talhoes/{id}
       final resposta = await _api.get(
         '/api/talhoes/${Uri.encodeComponent(id)}',
         token: token,
@@ -80,7 +79,6 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
 
       final detalhe = Map<String, dynamic>.from(resposta);
 
-      // Buscar análises de solo reais
       List<Map<String, dynamic>> analises = [];
       String? erroAnalises;
 
@@ -93,13 +91,11 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
           );
         }
 
-        // Mostrar apenas análises deste talhão
         analises = retorno
             .map((item) => Map<String, dynamic>.from(item as Map))
             .where((item) => item['talhaoId']?.toString() == id)
             .toList();
 
-        // Ordenar da análise mais recente para a antiga
         analises.sort(
           (a, b) => (b['dataColeta'] ?? '').toString().compareTo(
             (a['dataColeta'] ?? '').toString(),
@@ -131,7 +127,33 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
     }
   }
 
-  // FORMATAR TEXTO
+  // ABRIR CADASTRO DA ANÁLISE COM O ID CORRETO
+  Future<void> _abrirCadastroAnalise() async {
+    final id = widget.talhaoId?.trim();
+
+    if (id == null || id.isEmpty || _talhao == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível identificar o talhão.')),
+      );
+      return;
+    }
+
+    final nome = _talhao!['nome']?.toString();
+    final area = '${_numero(_talhao!['areaHa'])} ha';
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            AnaliseSoloScreen(talhaoId: id, talhaoNome: nome, talhaoArea: area),
+      ),
+    );
+
+    // Ao voltar do cadastro, atualiza o prontuário.
+    if (mounted) {
+      await _carregarDados();
+    }
+  }
+
   String _texto(dynamic valor, {String vazio = 'Não informado'}) {
     if (valor == null || valor.toString().trim().isEmpty) {
       return vazio;
@@ -140,7 +162,6 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
     return valor.toString();
   }
 
-  // FORMATAR NÚMERO
   String _numero(dynamic valor) {
     if (valor == null) {
       return 'Não informado';
@@ -155,7 +176,6 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
     return valor.toString().replaceAll('.', ',');
   }
 
-  // FORMATAR DATA
   String _data(dynamic valor) {
     final texto = valor?.toString();
 
@@ -171,12 +191,10 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
 
     final dia = data.day.toString().padLeft(2, '0');
     final mes = data.month.toString().padLeft(2, '0');
-    final ano = data.year;
 
-    return '$dia/$mes/$ano';
+    return '$dia/$mes/${data.year}';
   }
 
-  // RECUPERAR QUANTIDADE DA API
   int _quantidade(String campo) {
     final valor = _talhao?[campo];
 
@@ -187,7 +205,7 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
     return int.tryParse(valor?.toString() ?? '') ?? 0;
   }
 
-  // EXIBIR INFORMAÇÕES SOBRE PLANTIOS
+  // PLANTIOS AINDA DEPENDEM DE INTEGRAÇÃO
   void _mostrarPlantios() {
     final total = _quantidade('totalPlantios');
 
@@ -201,8 +219,8 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
                     'O cadastro e o histórico de plantios '
                     'ainda precisam ser integrados à API.'
               : 'A API informa $total plantio(s) '
-                    'neste talhão, mas ainda não disponibiliza '
-                    'o histórico detalhado por este endpoint.',
+                    'neste talhão, mas o histórico '
+                    'detalhado ainda não foi integrado.',
         ),
         actions: [
           TextButton(
@@ -216,7 +234,7 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
     );
   }
 
-  // EXIBIR ANÁLISES DE SOLO REAIS
+  // MOSTRAR ANÁLISES JÁ CADASTRADAS
   void _mostrarAnalises() {
     showDialog<void>(
       context: context,
@@ -269,7 +287,6 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
     );
   }
 
-  // CARD DE INFORMAÇÃO
   Widget _cartao(String titulo, String valor, IconData icone) {
     return SizedBox(
       width: 245,
@@ -300,7 +317,6 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
     );
   }
 
-  // LINHA DE INFORMAÇÕES
   Widget _linha(String rotulo, String valor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -319,7 +335,6 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
     );
   }
 
-  // INTERFACE PRINCIPAL
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -374,12 +389,15 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            TextButton.icon(
-              onPressed: () {
-                Navigator.maybePop(context);
-              },
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Voltar para Talhões'),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () {
+                  Navigator.maybePop(context);
+                },
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Voltar para Talhões'),
+              ),
             ),
 
             const SizedBox(height: 12),
@@ -415,14 +433,9 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
                   Icons.landscape,
                 ),
                 _cartao(
-                  'Plantios no prontuário',
+                  'Plantios registrados',
                   '${_quantidade('totalPlantios')}',
                   Icons.grass,
-                ),
-                _cartao(
-                  'Análises no prontuário',
-                  '${_quantidade('totalAnalises')}',
-                  Icons.analytics_outlined,
                 ),
                 _cartao(
                   'Laudos de solo',
@@ -436,16 +449,16 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
 
             const SizedBox(height: 28),
 
-            Text(
+            const Text(
               'Histórico e registros',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: corVerdeEscuro,
               ),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
             Wrap(
               spacing: 12,
@@ -456,11 +469,21 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
                   icon: const Icon(Icons.grass),
                   label: const Text('Ver plantios'),
                 ),
-                FilledButton.icon(
+
+                OutlinedButton.icon(
                   onPressed: _mostrarAnalises,
-                  style: FilledButton.styleFrom(backgroundColor: corVerdeClaro),
                   icon: const Icon(Icons.science_outlined),
                   label: const Text('Ver análises de solo'),
+                ),
+
+                FilledButton.icon(
+                  onPressed: _abrirCadastroAnalise,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: corVerdeClaro,
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Registrar análise de solo'),
                 ),
               ],
             ),
@@ -518,10 +541,10 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
             const SizedBox(height: 16),
 
             const Text(
-              'O status agronômico não é exibido porque '
-              'a resposta atual da API não fornece uma '
-              'classificação calculada. Nenhuma recomendação '
-              'ou indicador foi inventado.',
+              'Os valores são carregados da API Java. '
+              'A classificação agronômica do solo '
+              'ainda não está disponível na resposta '
+              'atual da API.',
               style: TextStyle(fontSize: 12, color: Colors.black54),
             ),
           ],
