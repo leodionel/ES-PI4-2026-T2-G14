@@ -1,47 +1,68 @@
 import 'package:flutter/material.dart';
 
-class AnaliseSoloScreen extends StatefulWidget {
-  final String talhaoNome;
-  final String talhaoArea;
+import '../data/services/api_client.dart';
+import '../data/services/token_storage.dart';
 
+class AnaliseSoloScreen extends StatefulWidget {
   const AnaliseSoloScreen({
     super.key,
-    this.talhaoNome = 'Talhão 04',
-    this.talhaoArea = '42,8 ha',
+    this.talhaoId,
+    this.talhaoNome,
+    this.talhaoArea,
   });
+
+  final String? talhaoId;
+  final String? talhaoNome;
+  final String? talhaoArea;
 
   @override
   State<AnaliseSoloScreen> createState() => _AnaliseSoloScreenState();
 }
 
 class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
-  // Paleta de cores oficial do projeto
-  final Color corFundo = const Color(0xFFF7F5EE);
-  final Color corCard = const Color(0xFFF0EBE1);
-  final Color corVerdeEscuro = const Color(0xFF4A5D23);
-  final Color corVerdeClaro = const Color(0xFF8DA259);
+  // CORES DO PROJETO
+  static const Color corFundo = Color(0xFFF7F5EE);
+  static const Color corCard = Color(0xFFF0EBE1);
+  static const Color corVerdeEscuro = Color(0xFF4A5D23);
+  static const Color corVerdeClaro = Color(0xFF8DA259);
 
+  // SERVIÇOS
+  final ApiClient _api = ApiClient();
+  final TokenStorage _tokenStorage = TokenStorage();
+
+  // FORMULÁRIO
   final _formKey = GlobalKey<FormState>();
 
-  // Controladores para os 5 campos estritamente obrigatórios (Seção 4 do MVP)
   final TextEditingController _dataAnaliseController = TextEditingController();
+
   final TextEditingController _phController = TextEditingController();
+
   final TextEditingController _fosforoController = TextEditingController();
+
   final TextEditingController _potassioController = TextEditingController();
-  final TextEditingController _saturacaoBasesController =
+
+  final TextEditingController _materiaOrganicaController =
       TextEditingController();
 
-  // Histórico de laudos exibido na tela (O status vem calculado pelo Backend - Seção 2 / RN02)
-  final List<Map<String, String>> _laudosCadastrados = [
-    {
-      'data': '10/01/2026',
-      'ph': '5,6',
-      'fosforo': '18,0',
-      'potassio': '2,4',
-      'saturacaoV': '65',
-      'statusBackend': 'Saudável',
-    },
-  ];
+  final TextEditingController _observacoesController = TextEditingController();
+
+  DateTime? _dataSelecionada;
+
+  // DADOS REAIS DA API
+  Map<String, dynamic>? _talhao;
+  String? _propriedadeId;
+
+  List<Map<String, dynamic>> _laudosCadastrados = [];
+
+  bool _carregando = true;
+  bool _salvando = false;
+  String? _erro;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarDados();
+  }
 
   @override
   void dispose() {
@@ -49,20 +70,158 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
     _phController.dispose();
     _fosforoController.dispose();
     _potassioController.dispose();
-    _saturacaoBasesController.dispose();
+    _materiaOrganicaController.dispose();
+    _observacoesController.dispose();
+
     super.dispose();
   }
 
-  Future<void> _selecionarData(BuildContext context) async {
+  // ============================================
+  // AUTENTICAÇÃO JWT
+  // ============================================
+
+  Future<String> _obterToken() async {
+    final token = await _tokenStorage.lerToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Sessão expirada. Faça login novamente.');
+    }
+
+    return token;
+  }
+
+  // ============================================
+  // CARREGAR DADOS REAIS DO BACKEND
+  // ============================================
+
+  Future<void> _carregarDados() async {
+    final talhaoId = widget.talhaoId?.trim();
+
+    if (talhaoId == null || talhaoId.isEmpty) {
+      setState(() {
+        _carregando = false;
+        _erro =
+            'Nenhum talhão foi selecionado. '
+            'Volte à lista de talhões e escolha um talhão.';
+      });
+
+      return;
+    }
+
+    setState(() {
+      _carregando = true;
+      _erro = null;
+    });
+
+    try {
+      final token = await _obterToken();
+
+      // BUSCAR DADOS DO TALHÃO
+      final retornoTalhao = await _api.get(
+        '/api/talhoes/${Uri.encodeComponent(talhaoId)}',
+        token: token,
+      );
+
+      if (retornoTalhao is! Map) {
+        throw const FormatException('A API não retornou os dados do talhão.');
+      }
+
+      final talhao = Map<String, dynamic>.from(retornoTalhao);
+
+      // BUSCAR PROPRIEDADES DO USUÁRIO
+      final retornoPropriedades = await _api.get(
+        '/api/propriedades',
+        token: token,
+      );
+
+      if (retornoPropriedades is! List || retornoPropriedades.isEmpty) {
+        throw Exception('Nenhuma propriedade cadastrada foi encontrada.');
+      }
+
+      final propriedade = Map<String, dynamic>.from(
+        retornoPropriedades.first as Map,
+      );
+
+      final propriedadeId = propriedade['id']?.toString();
+
+      if (propriedadeId == null || propriedadeId.isEmpty) {
+        throw const FormatException('A propriedade não possui um ID válido.');
+      }
+
+      // BUSCAR ANÁLISES SALVAS NO MONGODB
+      final retornoAnalises = await _api.get(
+        '/api/analises-solo',
+        token: token,
+      );
+
+      if (retornoAnalises is! List) {
+        throw const FormatException('A API não retornou a lista de análises.');
+      }
+
+      // FILTRAR ANÁLISES DO TALHÃO ATUAL
+      final analises = retornoAnalises
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .where(
+            (item) =>
+                item['talhaoId']?.toString() == talhaoId &&
+                item['propriedadeId']?.toString() == propriedadeId,
+          )
+          .toList();
+
+      // ORDENAR PELA DATA DA COLETA
+      analises.sort(
+        (a, b) => (b['dataColeta'] ?? '').toString().compareTo(
+          (a['dataColeta'] ?? '').toString(),
+        ),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _talhao = talhao;
+        _propriedadeId = propriedadeId;
+        _laudosCadastrados = analises;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _erro = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _carregando = false;
+        });
+      }
+    }
+  }
+
+  // ============================================
+  // CALENDÁRIO EM PORTUGUÊS BRASILEIRO
+  // ============================================
+
+  Future<void> _selecionarData() async {
     final DateTime? selecionada = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+
+      // IDIOMA PORTUGUÊS DO BRASIL
+      locale: const Locale('pt', 'BR'),
+
+      initialDate: _dataSelecionada ?? DateTime.now(),
+
       firstDate: DateTime(2015),
       lastDate: DateTime.now(),
+
+      // TEXTOS DO CALENDÁRIO EM PORTUGUÊS
+      helpText: 'SELECIONE A DATA DA ANÁLISE',
+      cancelText: 'CANCELAR',
+      confirmText: 'CONFIRMAR',
+
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
+            colorScheme: const ColorScheme.light(
               primary: corVerdeEscuro,
               onPrimary: Colors.white,
               onSurface: Colors.black87,
@@ -73,541 +232,219 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
       },
     );
 
-    if (selecionada != null) {
-      final dia = selecionada.day.toString().padLeft(2, '0');
-      final mes = selecionada.month.toString().padLeft(2, '0');
-      final ano = selecionada.year.toString();
+    if (selecionada != null && mounted) {
       setState(() {
-        _dataAnaliseController.text = '$dia/$mes/$ano';
+        _dataSelecionada = selecionada;
+
+        // DATA VISÍVEL: DD/MM/AAAA
+        _dataAnaliseController.text = _formatarDataSelecionada(selecionada);
       });
     }
   }
 
-  String? _validarNumeroObrigatorio(
+  // ============================================
+  // FORMATAÇÃO DA DATA BRASILEIRA
+  // ============================================
+
+  String _formatarDataSelecionada(DateTime data) {
+    final dia = data.day.toString().padLeft(2, '0');
+
+    final mes = data.month.toString().padLeft(2, '0');
+
+    final ano = data.year.toString();
+
+    return '$dia/$mes/$ano';
+  }
+
+  // FORMATO UTILIZADO INTERNAMENTE PELA API JAVA
+  String _dataParaApi(DateTime data) {
+    final mes = data.month.toString().padLeft(2, '0');
+
+    final dia = data.day.toString().padLeft(2, '0');
+
+    return '${data.year}-$mes-$dia';
+  }
+
+  // CONVERTER DATA DO BACKEND PARA PT-BR
+  String _formatarData(dynamic valor) {
+    final texto = valor?.toString() ?? '';
+
+    if (texto.isEmpty) {
+      return 'Não informada';
+    }
+
+    final data = DateTime.tryParse(texto);
+
+    if (data == null) {
+      return texto;
+    }
+
+    return _formatarDataSelecionada(data);
+  }
+
+  // ============================================
+  // FORMATAÇÃO DE NÚMEROS
+  // ============================================
+
+  String _formatarNumero(dynamic valor) {
+    if (valor == null) {
+      return 'Não informado';
+    }
+
+    if (valor is num) {
+      final casasDecimais = valor == valor.roundToDouble() ? 0 : 2;
+
+      return valor.toStringAsFixed(casasDecimais).replaceAll('.', ',');
+    }
+
+    return valor.toString().replaceAll('.', ',');
+  }
+
+  // ============================================
+  // VALIDAÇÃO DO FORMULÁRIO
+  // ============================================
+
+  String? _validarNumero(
     String? valor,
     String nomeCampo, {
+    bool obrigatorio = true,
     double? min,
     double? max,
   }) {
-    if (valor == null || valor.trim().isEmpty) {
-      return 'O campo $nomeCampo é obrigatório.';
+    final texto = (valor ?? '').trim();
+
+    if (texto.isEmpty) {
+      return obrigatorio ? 'O campo $nomeCampo é obrigatório.' : null;
     }
-    final normalizado = valor.replaceAll(',', '.');
-    final numero = double.tryParse(normalizado);
-    if (numero == null) {
+
+    final numero = double.tryParse(texto.replaceAll(',', '.'));
+
+    if (numero == null || !numero.isFinite) {
       return 'Informe um valor numérico válido.';
     }
+
     if (min != null && numero < min) {
       return 'Valor mínimo permitido: $min';
     }
+
     if (max != null && numero > max) {
       return 'Valor máximo permitido: $max';
     }
+
     return null;
   }
 
-  void _registrarLaudo() {
-    if (_formKey.currentState!.validate()) {
-      // O aplicativo apenas envia os dados brutos via socket/API;
-      // o status do solo é calculado exclusivamente pelo Backend (Seção 2).
-      setState(() {
-        _laudosCadastrados.insert(0, {
-          'data': _dataAnaliseController.text.trim(),
-          'ph': _phController.text.trim(),
-          'fosforo': _fosforoController.text.trim(),
-          'potassio': _potassioController.text.trim(),
-          'saturacaoV': _saturacaoBasesController.text.trim(),
-          'statusBackend': 'Aguardando cálculo do servidor',
-        });
+  double _converterNumero(String texto) {
+    return double.parse(texto.trim().replaceAll(',', '.'));
+  }
 
-        _dataAnaliseController.clear();
-        _phController.clear();
-        _fosforoController.clear();
-        _potassioController.clear();
-        _saturacaoBasesController.clear();
-      });
+  // ============================================
+  // CADASTRAR ANÁLISE NA API JAVA
+  // ============================================
 
+  Future<void> _registrarLaudo() async {
+    if (_salvando || _carregando) {
+      return;
+    }
+
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final talhaoId = widget.talhaoId;
+    final propriedadeId = _propriedadeId;
+    final dataColeta = _dataSelecionada;
+
+    if (talhaoId == null ||
+        talhaoId.isEmpty ||
+        propriedadeId == null ||
+        dataColeta == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: corVerdeEscuro,
-          content: const Text(
-            'Análise de solo registrada! Dados prontos para envio ao servidor.',
+        const SnackBar(
+          content: Text(
+            'Não foi possível identificar o talhão, '
+            'a propriedade ou a data da análise.',
           ),
         ),
       );
+
+      return;
+    }
+
+    setState(() {
+      _salvando = true;
+    });
+
+    try {
+      final token = await _obterToken();
+
+      final materiaOrganicaTexto = _materiaOrganicaController.text.trim();
+
+      final observacoesTexto = _observacoesController.text.trim();
+
+      // ENVIO DE DADOS REAIS AO BACKEND
+      await _api.post('/api/analises-solo', {
+        'propriedadeId': propriedadeId,
+        'talhaoId': talhaoId,
+
+        // API RECEBE AAAA-MM-DD
+        'dataColeta': _dataParaApi(dataColeta),
+
+        'ph': _converterNumero(_phController.text),
+
+        'fosforo': _converterNumero(_fosforoController.text),
+
+        'potassio': _converterNumero(_potassioController.text),
+
+        'materiaOrganica': materiaOrganicaTexto.isEmpty
+            ? null
+            : _converterNumero(materiaOrganicaTexto),
+
+        'observacoes': observacoesTexto.isEmpty ? null : observacoesTexto,
+      }, token: token);
+
+      if (!mounted) return;
+
+      // LIMPAR FORMULÁRIO APÓS SALVAR
+      _dataSelecionada = null;
+
+      _dataAnaliseController.clear();
+      _phController.clear();
+      _fosforoController.clear();
+      _potassioController.clear();
+      _materiaOrganicaController.clear();
+      _observacoesController.clear();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: corVerdeEscuro,
+          content: Text('Análise de solo salva com sucesso!'),
+        ),
+      );
+
+      // ATUALIZAR HISTÓRICO REAL
+      await _carregarDados();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.redAccent,
+          content: Text('Não foi possível salvar a análise: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _salvando = false;
+        });
+      }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: corFundo,
-      body: Row(
-        children: [
-          _buildSidebar(),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: ListView(
-                children: [
-                  // CABEÇALHO E NAVEGAÇÃO
-                  InkWell(
-                    onTap: () => Navigator.maybePop(context),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.arrow_back,
-                          size: 16,
-                          color: Colors.black54,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Voltar para ${widget.talhaoNome}',
-                          style: const TextStyle(color: Colors.black54),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Talhões / ${widget.talhaoNome} / Análise de Solo',
-                    style: const TextStyle(color: Colors.black45, fontSize: 12),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Registro de Análise de Solo',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: corVerdeEscuro,
-                      fontFamily: 'Serif',
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${widget.talhaoNome} (${widget.talhaoArea}) • Parâmetros químicos de rotina conforme Boletim Técnico 100 do IAC.',
-                    style: const TextStyle(fontSize: 16, color: Colors.black54),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // TEXTO DE AJUDA OBRIGATÓRIO NA INTERFACE (RN02 e Seção 1)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: corVerdeClaro),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.info_outline, color: corVerdeEscuro),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Como funciona a interpretação do solo (RN02)',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'O status do solo (Saudável, Atenção ou Risco) é calculado pelo servidor a partir da última análise cadastrada. '
-                                '"Saudável" significa apenas que nenhum indicador avaliado acendeu alerta. Talhão sem laudo recebe o status "Sem análise". '
-                                'Este sistema é um apoio à decisão: não prescreve doses de calcário ou fertilizantes e não substitui um engenheiro agrônomo.',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.black87,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-
-                  // CONTEÚDO PRINCIPAL: FORMULÁRIO (RF12) + ÚLTIMO LAUDO
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // COLUNA ESQUERDA: FORMULÁRIO DE CADASTRO DO LAUDO
-                      Expanded(
-                        flex: 6,
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: corCard,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Inserir Novo Laudo Químico',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: corVerdeEscuro,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Todos os campos abaixo são de preenchimento manual e obrigatório (RN07).',
-                                  style: TextStyle(
-                                    color: Colors.black54,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
-
-                                // 1. DATA DA ANÁLISE
-                                _buildLabel(
-                                  'Data da análise *',
-                                  'Identificação do laudo na linha do tempo',
-                                ),
-                                const SizedBox(height: 8),
-                                TextFormField(
-                                  controller: _dataAnaliseController,
-                                  readOnly: true,
-                                  onTap: () => _selecionarData(context),
-                                  decoration: _buildInputDecoration(
-                                    hint: 'DD/MM/AAAA',
-                                    suffixIcon: Icon(
-                                      Icons.calendar_today,
-                                      color: corVerdeEscuro,
-                                    ),
-                                  ),
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'A data da análise é obrigatória.';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 20),
-
-                                // LINHA 1 DE INDICADORES: pH (CaCl2) e Fósforo (P resina)
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          _buildLabel(
-                                            'pH (CaCl₂) *',
-                                            'Sem unidade (Ex: 5,5)',
-                                          ),
-                                          const SizedBox(height: 8),
-                                          TextFormField(
-                                            controller: _phController,
-                                            keyboardType:
-                                                const TextInputType.numberWithOptions(
-                                                  decimal: true,
-                                                ),
-                                            decoration: _buildInputDecoration(
-                                              hint: 'Ex: 5,6',
-                                            ),
-                                            validator: (v) =>
-                                                _validarNumeroObrigatorio(
-                                                  v,
-                                                  'pH (CaCl₂)',
-                                                  min: 0,
-                                                  max: 14,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          _buildLabel(
-                                            'Fósforo (P resina) *',
-                                            'Unidade: mg/dm³',
-                                          ),
-                                          const SizedBox(height: 8),
-                                          TextFormField(
-                                            controller: _fosforoController,
-                                            keyboardType:
-                                                const TextInputType.numberWithOptions(
-                                                  decimal: true,
-                                                ),
-                                            decoration: _buildInputDecoration(
-                                              hint: 'Ex: 18,0',
-                                              suffixText: 'mg/dm³',
-                                            ),
-                                            validator: (v) =>
-                                                _validarNumeroObrigatorio(
-                                                  v,
-                                                  'Fósforo (P)',
-                                                  min: 0,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 20),
-
-                                // LINHA 2 DE INDICADORES: Potássio (K) e Saturação por bases (V)
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          _buildLabel(
-                                            'Potássio (K) *',
-                                            'Unidade: mmolc/dm³',
-                                          ),
-                                          const SizedBox(height: 8),
-                                          TextFormField(
-                                            controller: _potassioController,
-                                            keyboardType:
-                                                const TextInputType.numberWithOptions(
-                                                  decimal: true,
-                                                ),
-                                            decoration: _buildInputDecoration(
-                                              hint: 'Ex: 2,4',
-                                              suffixText: 'mmolc/dm³',
-                                            ),
-                                            validator: (v) =>
-                                                _validarNumeroObrigatorio(
-                                                  v,
-                                                  'Potássio (K)',
-                                                  min: 0,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          _buildLabel(
-                                            'Saturação por bases (V) *',
-                                            'Unidade: % (0 a 100)',
-                                          ),
-                                          const SizedBox(height: 8),
-                                          TextFormField(
-                                            controller:
-                                                _saturacaoBasesController,
-                                            keyboardType:
-                                                const TextInputType.numberWithOptions(
-                                                  decimal: true,
-                                                ),
-                                            decoration: _buildInputDecoration(
-                                              hint: 'Ex: 65',
-                                              suffixText: '%',
-                                            ),
-                                            validator: (v) =>
-                                                _validarNumeroObrigatorio(
-                                                  v,
-                                                  'Saturação (V%)',
-                                                  min: 0,
-                                                  max: 100,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 28),
-
-                                // BOTÃO DE SUBMISSÃO GRANDE (RNF01)
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: _registrarLaudo,
-                                    icon: const Icon(Icons.science),
-                                    label: const Text(
-                                      'Registrar Análise de Solo',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: corVerdeEscuro,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 18,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-
-                      // COLUNA DIREITA: RESUMO DOS LAUDOS REGISTRADOS
-                      Expanded(
-                        flex: 5,
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: corCard,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Laudos Registrados',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: corVerdeEscuro,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'Histórico de análises químicas vinculadas a este talhão.',
-                                style: TextStyle(
-                                  color: Colors.black54,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-
-                              if (_laudosCadastrados.isEmpty)
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Text(
-                                    'Status: Sem análise (Nenhum laudo cadastrado para este talhão).',
-                                  ),
-                                )
-                              else
-                                ...List.generate(_laudosCadastrados.length, (
-                                  index,
-                                ) {
-                                  final laudo = _laudosCadastrados[index];
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 16),
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: index == 0
-                                            ? corVerdeClaro
-                                            : Colors.grey.shade300,
-                                        width: index == 0 ? 2 : 1,
-                                      ),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              'Laudo de ${laudo['data']}',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 16,
-                                                color: corVerdeEscuro,
-                                              ),
-                                            ),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 4,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: corVerdeClaro
-                                                    .withOpacity(0.25),
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                              ),
-                                              child: Text(
-                                                index == 0
-                                                    ? 'Último laudo (${laudo['statusBackend']})'
-                                                    : laudo['statusBackend']!,
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: corVerdeEscuro,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const Divider(height: 24),
-                                        _buildParametroRow(
-                                          'pH (CaCl₂)',
-                                          laudo['ph']!,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        _buildParametroRow(
-                                          'Fósforo (P resina)',
-                                          '${laudo['fosforo']} mg/dm³',
-                                        ),
-                                        const SizedBox(height: 8),
-                                        _buildParametroRow(
-                                          'Potássio (K)',
-                                          '${laudo['potassio']} mmolc/dm³',
-                                        ),
-                                        const SizedBox(height: 8),
-                                        _buildParametroRow(
-                                          'Saturação por bases (V)',
-                                          '${laudo['saturacaoV']} %',
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // ============================================
+  // COMPONENTES DO FORMULÁRIO
+  // ============================================
 
   Widget _buildLabel(String titulo, String subtitulo) {
     return Column(
@@ -620,6 +457,7 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
             color: Colors.black87,
           ),
         ),
+        const SizedBox(height: 3),
         Text(
           subtitulo,
           style: const TextStyle(fontSize: 12, color: Colors.black54),
@@ -643,25 +481,439 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
     );
   }
 
-  Widget _buildParametroRow(String nome, String valor) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _campoNumerico({
+    required String titulo,
+    required String subtitulo,
+    required String hint,
+    required TextEditingController controller,
+    required String nomeValidacao,
+    String? unidade,
+    bool obrigatorio = true,
+    double? minimo,
+    double? maximo,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(nome, style: const TextStyle(color: Colors.black87, fontSize: 13)),
-        Text(
-          valor,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-            fontSize: 13,
+        _buildLabel(titulo, subtitulo),
+        const SizedBox(height: 8),
+
+        TextFormField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: _buildInputDecoration(hint: hint, suffixText: unidade),
+          validator: (valor) => _validarNumero(
+            valor,
+            nomeValidacao,
+            obrigatorio: obrigatorio,
+            min: minimo,
+            max: maximo,
           ),
         ),
       ],
     );
   }
 
-  // --- SIDEBAR PADRÃO ---
+  Widget _buildParametroRow(String nome, String valor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              nome,
+              style: const TextStyle(color: Colors.black87, fontSize: 13),
+            ),
+          ),
+
+          Flexible(
+            child: Text(
+              valor,
+              textAlign: TextAlign.end,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================
+  // FORMULÁRIO DE CADASTRO
+  // ============================================
+
+  Widget _buildFormulario() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: corCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Inserir Novo Laudo Químico',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: corVerdeEscuro,
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            const Text(
+              'Preencha os dados da análise '
+              'para salvá-la no MongoDB Atlas.',
+              style: TextStyle(color: Colors.black54, fontSize: 14),
+            ),
+
+            const SizedBox(height: 24),
+
+            // DATA DA ANÁLISE
+            _buildLabel(
+              'Data da análise *',
+              'Identificação da coleta no histórico',
+            ),
+
+            const SizedBox(height: 8),
+
+            TextFormField(
+              controller: _dataAnaliseController,
+              readOnly: true,
+              onTap: _selecionarData,
+              decoration: _buildInputDecoration(
+                hint: 'DD/MM/AAAA',
+                suffixIcon: const Icon(
+                  Icons.calendar_today,
+                  color: corVerdeEscuro,
+                ),
+              ),
+              validator: (valor) {
+                if (_dataSelecionada == null) {
+                  return 'A data da análise é obrigatória.';
+                }
+
+                return null;
+              },
+            ),
+
+            const SizedBox(height: 20),
+
+            // PH E FÓSFORO
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _campoNumerico(
+                    titulo: 'pH (CaCl₂) *',
+                    subtitulo: 'Sem unidade',
+                    hint: 'Ex: 5,6',
+                    controller: _phController,
+                    nomeValidacao: 'pH',
+                    minimo: 0,
+                    maximo: 14,
+                  ),
+                ),
+
+                const SizedBox(width: 16),
+
+                Expanded(
+                  child: _campoNumerico(
+                    titulo: 'Fósforo (P resina) *',
+                    subtitulo: 'Unidade: mg/dm³',
+                    hint: 'Ex: 18,0',
+                    controller: _fosforoController,
+                    nomeValidacao: 'Fósforo',
+                    unidade: 'mg/dm³',
+                    minimo: 0,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // POTÁSSIO E MATÉRIA ORGÂNICA
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _campoNumerico(
+                    titulo: 'Potássio (K) *',
+                    subtitulo: 'Unidade: mmolc/dm³',
+                    hint: 'Ex: 2,4',
+                    controller: _potassioController,
+                    nomeValidacao: 'Potássio',
+                    unidade: 'mmolc/dm³',
+                    minimo: 0,
+                  ),
+                ),
+
+                const SizedBox(width: 16),
+
+                Expanded(
+                  child: _campoNumerico(
+                    titulo: 'Matéria orgânica',
+                    subtitulo: 'Opcional',
+                    hint: 'Informe o valor',
+                    controller: _materiaOrganicaController,
+                    nomeValidacao: 'Matéria orgânica',
+                    obrigatorio: false,
+                    minimo: 0,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // OBSERVAÇÕES
+            _buildLabel('Observações', 'Informações complementares (opcional)'),
+
+            const SizedBox(height: 8),
+
+            TextFormField(
+              controller: _observacoesController,
+              maxLines: 3,
+              maxLength: 1000,
+              decoration: _buildInputDecoration(
+                hint: 'Observações sobre a coleta ou laudo',
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // AVISO SOBRE SATURAÇÃO POR BASES
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'A saturação por bases (V%) '
+                'ainda não faz parte do cadastro '
+                'da API Java. '
+                'Ela não será solicitada nem '
+                'simulada nesta versão.',
+                style: TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // BOTÃO DE CADASTRO
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _salvando ? null : _registrarLaudo,
+
+                icon: _salvando
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.science),
+
+                label: Text(
+                  _salvando
+                      ? 'Salvando análise...'
+                      : 'Registrar Análise de Solo',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: corVerdeEscuro,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================
+  // HISTÓRICO REAL DE ANÁLISES
+  // ============================================
+
+  Widget _buildHistorico() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: corCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Laudos Registrados',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: corVerdeEscuro,
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          const Text(
+            'Histórico real das análises '
+            'vinculadas a este talhão.',
+            style: TextStyle(fontSize: 14, color: Colors.black54),
+          ),
+
+          const SizedBox(height: 16),
+
+          TextButton.icon(
+            onPressed: _salvando ? null : _carregarDados,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Atualizar histórico'),
+          ),
+
+          const SizedBox(height: 12),
+
+          // NENHUMA ANÁLISE ENCONTRADA
+          if (_laudosCadastrados.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'Nenhuma análise de solo '
+                'cadastrada para este talhão.',
+              ),
+            )
+          else
+            ...List.generate(_laudosCadastrados.length, (index) {
+              final laudo = _laudosCadastrados[index];
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: index == 0 ? corVerdeClaro : Colors.grey.shade300,
+                    width: index == 0 ? 2 : 1,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // DATA DO LAUDO EM PORTUGUÊS
+                    Text(
+                      'Laudo de '
+                      '${_formatarData(laudo['dataColeta'])}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: corVerdeEscuro,
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    if (index == 0)
+                      const Text(
+                        'Análise mais recente',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: corVerdeClaro,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                    const Divider(height: 24),
+
+                    _buildParametroRow(
+                      'pH (CaCl₂)',
+                      _formatarNumero(laudo['ph']),
+                    ),
+
+                    _buildParametroRow(
+                      'Fósforo (P resina)',
+                      _formatarNumero(laudo['fosforo']),
+                    ),
+
+                    _buildParametroRow(
+                      'Potássio (K)',
+                      _formatarNumero(laudo['potassio']),
+                    ),
+
+                    _buildParametroRow(
+                      'Matéria orgânica',
+                      _formatarNumero(laudo['materiaOrganica']),
+                    ),
+
+                    if (laudo['observacoes'] != null &&
+                        laudo['observacoes'].toString().trim().isNotEmpty) ...[
+                      const Divider(height: 24),
+
+                      const Text(
+                        'Observações:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      Text(laudo['observacoes'].toString()),
+                    ],
+                  ],
+                ),
+              );
+            }),
+
+          const SizedBox(height: 8),
+
+          const Text(
+            'A API atual não retorna um status '
+            'agronômico calculado. '
+            'Os valores exibidos são os registrados.',
+            style: TextStyle(fontSize: 12, color: Colors.black54),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================
+  // MENU LATERAL
+  // ============================================
+
   Widget _buildSidebar() {
+    final nome = _talhao?['nome']?.toString() ?? widget.talhaoNome ?? 'Talhão';
+
+    final area = _talhao == null
+        ? (widget.talhaoArea ?? 'Não informada')
+        : '${_formatarNumero(_talhao!['areaHa'])} ha';
+
     return Container(
       width: 250,
       color: corCard,
@@ -669,7 +921,7 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Prontuário Digital\ndo Talhão',
             style: TextStyle(
               fontSize: 20,
@@ -678,7 +930,9 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
               fontFamily: 'Serif',
             ),
           ),
+
           const SizedBox(height: 40),
+
           const Text(
             'GESTÃO DA FAZENDA',
             style: TextStyle(
@@ -687,31 +941,50 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
               color: Colors.grey,
             ),
           ),
+
           const SizedBox(height: 16),
-          _buildMenuItem(Icons.dashboard, 'Dashboard'),
-          _buildMenuItem(Icons.layers, 'Talhões', isActive: true),
-          _buildMenuItem(Icons.autorenew, 'Simulação de Rotação'),
-          _buildMenuItem(Icons.person, 'Perfil'),
+
+          ListTile(
+            leading: const Icon(Icons.arrow_back),
+            title: const Text('Voltar ao talhão'),
+            onTap: () {
+              Navigator.maybePop(context);
+            },
+          ),
+
+          const ListTile(
+            leading: Icon(Icons.science, color: corVerdeEscuro),
+            title: Text(
+              'Análise de Solo',
+              style: TextStyle(
+                color: corVerdeEscuro,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+
           const Spacer(),
+
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white54,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(nome, style: const TextStyle(fontWeight: FontWeight.bold)),
+
+                const SizedBox(height: 8),
+
                 Text(
-                  'Área monitorada',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  area,
+                  style: const TextStyle(fontSize: 20, color: Colors.black87),
                 ),
-                Text(
-                  '128,4 ha',
-                  style: TextStyle(fontSize: 20, color: Colors.black87),
-                ),
-                Text(
-                  '4 talhões cadastrados',
+
+                const Text(
+                  'Área do talhão selecionado',
                   style: TextStyle(fontSize: 11, color: Colors.black54),
                 ),
               ],
@@ -722,23 +995,173 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String title, {bool isActive = false}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: isActive ? Colors.white : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: isActive ? corVerdeEscuro : Colors.black54),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: isActive ? corVerdeEscuro : Colors.black87,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+  // ============================================
+  // CONTEÚDO PRINCIPAL
+  // ============================================
+
+  Widget _buildConteudo() {
+    final nome = _talhao?['nome']?.toString() ?? widget.talhaoNome ?? 'Talhão';
+
+    final area = _talhao == null
+        ? (widget.talhaoArea ?? 'Não informada')
+        : '${_formatarNumero(_talhao!['areaHa'])} ha';
+
+    return ListView(
+      padding: const EdgeInsets.all(32),
+      children: [
+        // VOLTAR
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () {
+              Navigator.maybePop(context);
+            },
+            icon: const Icon(Icons.arrow_back),
+            label: Text('Voltar para $nome'),
           ),
         ),
-        onTap: () {},
+
+        const SizedBox(height: 8),
+
+        Text(
+          'Talhões / $nome / Análise de Solo',
+          style: const TextStyle(color: Colors.black45, fontSize: 12),
+        ),
+
+        const SizedBox(height: 8),
+
+        const Text(
+          'Registro de Análise de Solo',
+          style: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+            color: corVerdeEscuro,
+            fontFamily: 'Serif',
+          ),
+        ),
+
+        const SizedBox(height: 4),
+
+        Text(
+          '$nome ($area) • Análises químicas '
+          'registradas no sistema.',
+          style: const TextStyle(fontSize: 16, color: Colors.black54),
+        ),
+
+        const SizedBox(height: 24),
+
+        // INFORMAÇÕES SOBRE A ANÁLISE
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: corVerdeClaro),
+          ),
+          child: const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline, color: corVerdeEscuro),
+
+              SizedBox(width: 12),
+
+              Expanded(
+                child: Text(
+                  'Esta tela registra e consulta '
+                  'dados reais de análises de solo. '
+                  'A interpretação agronômica deve '
+                  'ser realizada pelo backend. '
+                  'O sistema é um apoio à decisão '
+                  'e não substitui um engenheiro '
+                  'agrônomo.',
+                  style: TextStyle(fontSize: 13, height: 1.4),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 28),
+
+        // FORMULÁRIO E HISTÓRICO
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 850) {
+              return Column(
+                children: [
+                  _buildFormulario(),
+
+                  const SizedBox(height: 24),
+
+                  _buildHistorico(),
+                ],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 6, child: _buildFormulario()),
+
+                const SizedBox(width: 24),
+
+                Expanded(flex: 5, child: _buildHistorico()),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  // ============================================
+  // CONSTRUÇÃO DA TELA
+  // ============================================
+
+  @override
+  Widget build(BuildContext context) {
+    final mostrarSidebar = MediaQuery.sizeOf(context).width >= 800;
+
+    return Scaffold(
+      backgroundColor: corFundo,
+      body: Row(
+        children: [
+          if (mostrarSidebar) _buildSidebar(),
+
+          Expanded(
+            child: _carregando
+                ? const Center(child: CircularProgressIndicator())
+                : _erro != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(_erro!, textAlign: TextAlign.center),
+
+                          const SizedBox(height: 16),
+
+                          FilledButton(
+                            onPressed: _carregarDados,
+                            child: const Text('Tentar novamente'),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          TextButton(
+                            onPressed: () {
+                              Navigator.maybePop(context);
+                            },
+                            child: const Text('Voltar'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : _buildConteudo(),
+          ),
+        ],
       ),
     );
   }
