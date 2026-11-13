@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'core/theme/app_theme.dart';
@@ -16,6 +17,18 @@ class App extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Prontuário Digital do Talhão',
       theme: AppTheme.claro,
+
+      // Configuração do idioma português brasileiro.
+      locale: const Locale('pt', 'BR'),
+
+      supportedLocales: const [Locale('pt', 'BR')],
+
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+
       home: Consumer<AuthRepository>(
         builder: (context, auth, child) {
           // Verifica se existe uma sessão JWT salva.
