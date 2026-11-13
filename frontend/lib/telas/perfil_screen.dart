@@ -118,12 +118,16 @@ class PerfilScreen extends StatelessWidget {
 
                     const SizedBox(height: 28),
 
-                    const SizedBox(
+                    SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
                         onPressed: null,
-                        icon: Icon(Icons.edit_outlined),
-                        label: Text('Editar dados'),
+                        icon: const Icon(
+                          Icons.edit_outlined,
+                        ),
+                        label: const Text(
+                          'Editar dados',
+                        ),
                       ),
                     ),
                   ],
@@ -175,7 +179,9 @@ class PerfilScreen extends StatelessWidget {
                   onPressed: () {
                     Navigator.of(context).maybePop();
                   },
-                  icon: const Icon(Icons.arrow_back),
+                  icon: const Icon(
+                    Icons.arrow_back,
+                  ),
                   label: const Text(
                     'Voltar ao Dashboard',
                   ),
