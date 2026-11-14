@@ -1,4 +1,4 @@
-package br.com.talhao.model.cultura;
+package br.com.talhao.model;
 
 public enum TipoUso { 
     COMERCIAL, COBERTURA 
