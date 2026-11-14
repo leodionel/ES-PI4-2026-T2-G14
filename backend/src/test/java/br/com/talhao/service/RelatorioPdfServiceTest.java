@@ -65,7 +65,7 @@ class RelatorioPdfServiceTest {
                 5.8,
                 12.0,
                 4.0,
-                2.5,
+                60.0,
                 "Observacoes da analise " + numero
         );
     }
