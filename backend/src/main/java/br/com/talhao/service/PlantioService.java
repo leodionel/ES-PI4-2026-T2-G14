@@ -18,7 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.mongodb.client.result.UpdateResult;
 
 import br.com.talhao.dto.PlantioResponse;
-import br.com.talhao.model.cultura.Cultura;
+import br.com.talhao.model.Cultura;
 import br.com.talhao.model.Plantio;
 import br.com.talhao.model.Talhao;
 
@@ -148,7 +148,13 @@ public class PlantioService {
             );
         }
 
-        String nome = culturaService.buscar(plantio.culturaId()).nome();
+        // A cultura ja foi validada no plantio; se sair do catalogo,
+        // a colheita (ja gravada) nao deve falhar por causa do nome
+        String nome = culturaService.listar().stream()
+                .filter(c -> c.id().equals(plantio.culturaId()))
+                .map(Cultura::nome)
+                .findFirst()
+                .orElse(plantio.culturaId());
 
         return paraResponse(
                 new Plantio(
