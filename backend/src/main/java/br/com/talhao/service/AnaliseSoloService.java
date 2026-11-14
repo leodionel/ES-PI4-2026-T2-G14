@@ -10,6 +10,7 @@ import org.springframework.web.server.ResponseStatusException;
 import br.com.talhao.dto.CadastroAnaliseSoloRequest;
 import br.com.talhao.model.AnaliseSolo;
 import br.com.talhao.repository.AnaliseSoloRepository;
+import br.com.talhao.repository.TalhaoRepository;
 
 // Contem as regras de negocio das analises de solo
 @Service
@@ -17,14 +18,34 @@ public class AnaliseSoloService {
 
     private final AnaliseSoloRepository analiseSoloRepository;
     private final PropriedadeService propriedadeService;
+    private final TalhaoRepository talhaoRepository;
 
     // Recebe as dependencias pelo construtor
     public AnaliseSoloService(
             AnaliseSoloRepository analiseSoloRepository,
-            PropriedadeService propriedadeService) {
+            PropriedadeService propriedadeService,
+            TalhaoRepository talhaoRepository) {
 
         this.analiseSoloRepository = analiseSoloRepository;
         this.propriedadeService = propriedadeService;
+        this.talhaoRepository = talhaoRepository;
+    }
+
+    // Confirma que a propriedade e do usuario e que o talhao
+    // pertence a essa propriedade
+    private void validarTalhao(
+            String usuarioId,
+            String propriedadeId,
+            String talhaoId) {
+
+        propriedadeService.buscarPorId(propriedadeId, usuarioId);
+
+        talhaoRepository
+                .findByIdAndPropriedadeId(talhaoId, propriedadeId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Talhao nao encontrado"
+                ));
     }
 
     // Cadastra uma nova analise de solo
@@ -32,10 +53,11 @@ public class AnaliseSoloService {
             String usuarioId,
             CadastroAnaliseSoloRequest dados) {
 
-        // Verifica se a propriedade pertence ao usuario
-        propriedadeService.buscarPorId(
+        // Verifica a propriedade e o talhao
+        validarTalhao(
+                usuarioId,
                 dados.propriedadeId(),
-                usuarioId
+                dados.talhaoId()
         );
 
         // Cria a analise vinculada ao usuario
@@ -48,7 +70,7 @@ public class AnaliseSoloService {
                 dados.ph(),
                 dados.fosforo(),
                 dados.potassio(),
-                dados.materiaOrganica(),
+                dados.saturacaoBases(),
                 dados.observacoes()
         );
 
@@ -128,10 +150,11 @@ public class AnaliseSoloService {
         // Confirma que a analise pertence ao usuario
         buscarPorId(id, usuarioId);
 
-        // Verifica a propriedade informada
-        propriedadeService.buscarPorId(
+        // Verifica a propriedade e o talhao informados
+        validarTalhao(
+                usuarioId,
                 dados.propriedadeId(),
-                usuarioId
+                dados.talhaoId()
         );
 
         // Mantem o ID e o usuario original
@@ -144,7 +167,7 @@ public class AnaliseSoloService {
                 dados.ph(),
                 dados.fosforo(),
                 dados.potassio(),
-                dados.materiaOrganica(),
+                dados.saturacaoBases(),
                 dados.observacoes()
         );
 
