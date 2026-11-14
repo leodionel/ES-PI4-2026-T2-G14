@@ -146,7 +146,7 @@ class RelatorioPdfServiceTest {
             assertTrue(texto.contains("5,80"));
             assertTrue(texto.contains("12,00"));
             assertTrue(texto.contains("4,00"));
-            assertTrue(texto.contains("2,50"));
+            assertTrue(texto.contains("Saturacao por bases (V%): 60,00"));
         }
 
         verify(propriedadeService).buscarPorId(
