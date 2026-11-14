@@ -7,7 +7,6 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
 import br.com.talhao.model.AnaliseSolo;
-import tools.jackson.databind.ext.OptionalHandlerFactory;
 
 //Responsavel pelo acesso as analises de solo no MongoDB
 @Repository 
@@ -37,4 +36,10 @@ public interface AnaliseSoloRepository
             String id,
             String usuarioId
         );
+
+        // Conta as analises de um talhao
+        long countByTalhaoId(String talhaoId);
+
+        // Remove as analises de um talhao
+        void deleteByTalhaoId(String talhaoId);
     }
