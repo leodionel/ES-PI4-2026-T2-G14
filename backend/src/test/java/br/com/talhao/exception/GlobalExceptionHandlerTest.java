@@ -82,7 +82,7 @@ class GlobalExceptionHandlerTest {
                     "ph": 17.0,
                     "fosforo": 12.0,
                     "potassio": 4.0,
-                    "materiaOrganica": 2.5,
+                    "saturacaoBases": 60.0,
                     "observacoes": "Teste"
                 }
                 """;

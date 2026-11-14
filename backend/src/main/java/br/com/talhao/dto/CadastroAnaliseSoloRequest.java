@@ -39,23 +39,31 @@ public record CadastroAnaliseSoloRequest(
         )
         Double ph,
 
-        // Teor de fosforo
+        // Fosforo (P resina) em mg/dm3
+        @NotNull(message = "O fosforo e obrigatorio")
         @PositiveOrZero(
                 message = "O fosforo nao pode ser negativo"
         )
         Double fosforo,
 
-        // Teor de potassio
+        // Potassio (K) em mmolc/dm3
+        @NotNull(message = "O potassio e obrigatorio")
         @PositiveOrZero(
                 message = "O potassio nao pode ser negativo"
         )
         Double potassio,
 
-        // Teor de materia organica
-        @PositiveOrZero(
-                message = "A materia organica nao pode ser negativa"
+        // Saturacao por bases (V) em %
+        @NotNull(message = "A saturacao por bases (V%) e obrigatoria")
+        @DecimalMin(
+                value = "0.0",
+                message = "A saturacao por bases nao pode ser negativa"
         )
-        Double materiaOrganica,
+        @DecimalMax(
+                value = "100.0",
+                message = "A saturacao por bases nao pode ser maior que 100"
+        )
+        Double saturacaoBases,
 
         // Observacoes complementares
         @Size(
