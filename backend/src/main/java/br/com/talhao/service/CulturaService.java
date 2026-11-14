@@ -10,7 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import br.com.talhao.model.cultura.Cultura;
+import br.com.talhao.model.Cultura;
 import br.com.talhao.repository.CulturaRepository;
 
 // Consulta o catalogo de culturas, mantido em memoria depois da primeira leitura
