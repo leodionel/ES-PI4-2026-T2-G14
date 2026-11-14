@@ -78,7 +78,7 @@ class AnaliseSoloControllerTest {
                 5.8,
                 12.0,
                 4.0,
-                2.5,
+                60.0,
                 "Amostra de teste"
         );
     }
@@ -94,7 +94,7 @@ class AnaliseSoloControllerTest {
                     "ph": 5.8,
                     "fosforo": 12.0,
                     "potassio": 4.0,
-                    "materiaOrganica": 2.5,
+                    "saturacaoBases": 60.0,
                     "observacoes": "Amostra de teste"
                 }
                 """;
@@ -162,7 +162,7 @@ class AnaliseSoloControllerTest {
                     "ph": 15.0,
                     "fosforo": 12.0,
                     "potassio": 4.0,
-                    "materiaOrganica": 2.5
+                    "saturacaoBases": 60.0
                 }
                 """;
 
@@ -172,6 +172,40 @@ class AnaliseSoloControllerTest {
                 .content(dadosInvalidos))
 
                 .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(analiseSoloService);
+    }
+
+    // TESTE 4B - Recusar analise sem V% e com V% acima de 100
+    @Test
+    void deveRecusarSaturacaoAusenteOuInvalida() throws Exception {
+
+        configurarJwtValido();
+
+        String semV = """
+                {
+                    "propriedadeId": "propriedade-1",
+                    "talhaoId": "talhao-1",
+                    "dataColeta": "2026-10-20",
+                    "ph": 5.8,
+                    "fosforo": 12.0,
+                    "potassio": 4.0
+                }
+                """;
+
+        String vAcimaDe100 = semV.replace(
+                "\"potassio\": 4.0",
+                "\"potassio\": 4.0, \"saturacaoBases\": 101.0"
+        );
+
+        for (String corpo : new String[] {semV, vAcimaDe100}) {
+            mockMvc.perform(post("/api/analises-solo")
+                    .header("Authorization", AUTHORIZATION)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(corpo))
+
+                    .andExpect(status().isBadRequest());
+        }
 
         verifyNoInteractions(analiseSoloService);
     }

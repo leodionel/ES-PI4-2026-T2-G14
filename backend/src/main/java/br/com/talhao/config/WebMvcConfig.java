@@ -25,6 +25,14 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 new JwtAuthInterceptor(jwtDecoder)
         ).addPathPatterns(
 
+                // Rotas de talhoes e plantios
+                "/api/talhoes",
+                "/api/talhoes/**",
+
+                // Rotas do catalogo de culturas
+                "/api/culturas",
+                "/api/culturas/**",
+
                 // Rotas de propriedades
                 "/api/propriedades",
                 "/api/propriedades/**",

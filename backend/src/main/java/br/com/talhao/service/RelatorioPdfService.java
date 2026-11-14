@@ -182,8 +182,8 @@ public class RelatorioPdfService {
                         );
 
                         escritor.escrever(
-                                "Materia organica: " +
-                                formatarNumero(analise.materiaOrganica()),
+                                "Saturacao por bases (V%): " +
+                                formatarNumero(analise.saturacaoBases()),
                                 FONTE_NORMAL,
                                 11
                         );

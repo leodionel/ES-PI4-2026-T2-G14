@@ -17,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import br.com.talhao.model.Propriedade;
 import br.com.talhao.repository.PropriedadeRepository;
+import br.com.talhao.repository.TalhaoRepository;
 import br.com.talhao.repository.UsuarioRepository;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -34,6 +35,10 @@ class PropriedadeServiceTest {
     // Simula o repositorio de usuarios
     @Mock
     private UsuarioRepository usuarioRepository;
+
+    // Simula o repositorio de talhoes
+    @Mock
+    private TalhaoRepository talhaoRepository;
 
     // Service real que sera testado
     @InjectMocks
@@ -338,5 +343,53 @@ class PropriedadeServiceTest {
         assertEquals(HttpStatus.BAD_REQUEST, erro.getStatusCode());
 
         verifyNoInteractions(propriedadeRepository);
+    }
+
+    // TESTE 13
+    // RN11: o usuario so pode ter uma propriedade
+    @Test
+    void deveBloquearSegundaPropriedadeDoUsuario() {
+
+        when(usuarioRepository.existsById("usuario-1"))
+                .thenReturn(true);
+
+        when(propriedadeRepository.findByUsuarioId("usuario-1"))
+                .thenReturn(List.of(criarPropriedade()));
+
+        ResponseStatusException erro = assertThrows(
+                ResponseStatusException.class,
+                () -> propriedadeService.cadastrar(
+                        "usuario-1",
+                        "Outra Fazenda",
+                        "Piracicaba - SP"
+                )
+        );
+
+        assertEquals(HttpStatus.CONFLICT, erro.getStatusCode());
+        verify(propriedadeRepository, never())
+                .save(any(Propriedade.class));
+    }
+
+    // TESTE 14
+    // Nao exclui a propriedade enquanto houver talhoes
+    @Test
+    void deveBloquearExclusaoDePropriedadeComTalhoes() {
+
+        when(propriedadeRepository.findByIdAndUsuarioId(
+                "prop-1",
+                "usuario-1"
+        )).thenReturn(Optional.of(criarPropriedade()));
+
+        when(talhaoRepository.existsByPropriedadeId("prop-1"))
+                .thenReturn(true);
+
+        ResponseStatusException erro = assertThrows(
+                ResponseStatusException.class,
+                () -> propriedadeService.excluir("prop-1", "usuario-1")
+        );
+
+        assertEquals(HttpStatus.CONFLICT, erro.getStatusCode());
+        verify(propriedadeRepository, never())
+                .delete(any(Propriedade.class));
     }
 }
