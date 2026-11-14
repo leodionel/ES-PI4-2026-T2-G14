@@ -1,6 +1,7 @@
 
 package br.com.talhao.service;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -17,7 +18,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import br.com.talhao.dto.CadastroAnaliseSoloRequest;
 import br.com.talhao.model.AnaliseSolo;
+import br.com.talhao.model.Talhao;
 import br.com.talhao.repository.AnaliseSoloRepository;
+import br.com.talhao.repository.TalhaoRepository;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -35,6 +38,10 @@ class AnaliseSoloServiceTest {
     @Mock
     private PropriedadeService propriedadeService;
 
+    // Simula o acesso aos talhoes
+    @Mock
+    private TalhaoRepository talhaoRepository;
+
     // Cria o Service com as dependencias simuladas
     @InjectMocks
     private AnaliseSoloService analiseSoloService;
@@ -48,7 +55,7 @@ class AnaliseSoloServiceTest {
                 5.8,
                 12.0,
                 4.0,
-                2.5,
+                60.0,
                 "Amostra de teste"
         );
     }
@@ -64,9 +71,24 @@ class AnaliseSoloServiceTest {
                 5.8,
                 12.0,
                 4.0,
-                2.5,
+                60.0,
                 "Amostra de teste"
         );
+    }
+
+    // Simula um talhao existente na propriedade
+    private void simularTalhaoExistente() {
+        when(talhaoRepository.findByIdAndPropriedadeId(
+                "talhao-1",
+                "propriedade-1"
+        )).thenReturn(Optional.of(new Talhao(
+                "talhao-1",
+                "propriedade-1",
+                "Talhao 01",
+                10.0,
+                Instant.now(),
+                List.of()
+        )));
     }
 
     // TESTE 1 - Cadastrar analise de solo
@@ -74,6 +96,8 @@ class AnaliseSoloServiceTest {
     void deveCadastrarAnaliseSolo() {
 
         CadastroAnaliseSoloRequest dados = criarDados();
+
+        simularTalhaoExistente();
 
         // Simula o MongoDB salvando a analise
         when(analiseSoloRepository.save(any(AnaliseSolo.class)))
@@ -87,6 +111,7 @@ class AnaliseSoloServiceTest {
         assertEquals("propriedade-1", resultado.propriedadeId());
         assertEquals("talhao-1", resultado.talhaoId());
         assertEquals(5.8, resultado.ph());
+        assertEquals(60.0, resultado.saturacaoBases());
 
         // Verifica se o acesso a propriedade foi conferido
         verify(propriedadeService).buscarPorId(
@@ -198,6 +223,8 @@ class AnaliseSoloServiceTest {
 
         CadastroAnaliseSoloRequest dados = criarDados();
 
+        simularTalhaoExistente();
+
         when(analiseSoloRepository.findByIdAndUsuarioId(
                 "analise-1",
                 "usuario-1"
@@ -242,5 +269,57 @@ class AnaliseSoloServiceTest {
 
         // Confirma que o MongoDB recebeu a exclusao
         verify(analiseSoloRepository).delete(analise);
+    }
+
+    // TESTE 8 - Nao cadastrar analise em talhao inexistente
+    // ou que pertence a outra propriedade
+    @Test
+    void deveRecusarCadastroEmTalhaoInexistente() {
+
+        // O talhao nao e encontrado nessa propriedade
+        when(talhaoRepository.findByIdAndPropriedadeId(
+                "talhao-1",
+                "propriedade-1"
+        )).thenReturn(Optional.empty());
+
+        ResponseStatusException erro = assertThrows(
+                ResponseStatusException.class,
+                () -> analiseSoloService.cadastrar(
+                        "usuario-1",
+                        criarDados()
+                )
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, erro.getStatusCode());
+        verify(analiseSoloRepository, never())
+                .save(any(AnaliseSolo.class));
+    }
+
+    // TESTE 9 - Nao mover analise para um talhao invalido
+    @Test
+    void deveRecusarAtualizacaoParaTalhaoInexistente() {
+
+        when(analiseSoloRepository.findByIdAndUsuarioId(
+                "analise-1",
+                "usuario-1"
+        )).thenReturn(Optional.of(criarAnalise()));
+
+        when(talhaoRepository.findByIdAndPropriedadeId(
+                "talhao-1",
+                "propriedade-1"
+        )).thenReturn(Optional.empty());
+
+        ResponseStatusException erro = assertThrows(
+                ResponseStatusException.class,
+                () -> analiseSoloService.atualizar(
+                        "analise-1",
+                        "usuario-1",
+                        criarDados()
+                )
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, erro.getStatusCode());
+        verify(analiseSoloRepository, never())
+                .save(any(AnaliseSolo.class));
     }
 }
