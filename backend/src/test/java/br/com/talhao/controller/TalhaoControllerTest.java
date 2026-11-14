@@ -1,6 +1,8 @@
 package br.com.talhao.controller;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -32,16 +34,27 @@ class TalhaoControllerTest {
     @MockitoBean
     private TalhaoService talhaoService;
 
+    // Simula a validacao do JWT feita pelo interceptor
     @MockitoBean
     private JwtDecoder jwtDecoder;
 
-    // Simula um token valido do usuario u1
+    private static final String TOKEN = "token-teste";
+    private static final String AUTHORIZATION = "Bearer " + TOKEN;
+
+    // Configura um JWT valido para o usuario u1
     private void autenticarComoUsuario1() {
-        Jwt jwt = Jwt.withTokenValue("abc")
-                .header("alg", "HS256")
-                .subject("u1")
-                .build();
-        when(jwtDecoder.decode("abc")).thenReturn(jwt);
+
+        Instant agora = Instant.now();
+
+        Jwt jwt = new Jwt(
+                TOKEN,
+                agora,
+                agora.plusSeconds(3600),
+                Map.of("alg", "HS256"),
+                Map.of("iss", "talhao-api", "sub", "u1")
+        );
+
+        when(jwtDecoder.decode(TOKEN)).thenReturn(jwt);
     }
 
     // TESTE 1 - Sem token, a resposta e HTTP 401
@@ -60,7 +73,7 @@ class TalhaoControllerTest {
         when(talhaoService.listar("u1")).thenReturn(List.of());
 
         mockMvc.perform(get("/api/talhoes")
-                .header("Authorization", "Bearer abc"))
+                .header("Authorization", AUTHORIZATION))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
     }
@@ -72,7 +85,7 @@ class TalhaoControllerTest {
         autenticarComoUsuario1();
 
         mockMvc.perform(post("/api/talhoes")
-                .header("Authorization", "Bearer abc")
+                .header("Authorization", AUTHORIZATION)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     { "nome": "Talhão 04", "areaHa": -3 }
@@ -89,7 +102,7 @@ class TalhaoControllerTest {
                 .when(talhaoService).excluir("t1", "u1", "errado");
 
         mockMvc.perform(delete("/api/talhoes/t1")
-                .header("Authorization", "Bearer abc")
+                .header("Authorization", AUTHORIZATION)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     { "confirmacaoNome": "errado" }
