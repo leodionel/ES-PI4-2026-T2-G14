@@ -1,4 +1,3 @@
-
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
@@ -25,9 +24,10 @@ public class SupervisoraDeConexao extends Thread {
         this.clientes = clientes;
 
         // Cliente HTTP utilizado para consultar o Spring Boot
-        this.backend = new BackendClient(
-                "http://localhost:8081"
-        );
+        this.backend = 
+            new BackendClient(
+                System.getenv().getOrDefault("BACKEND_URL", "http://localhost:8081")
+            );
     }
 
     @Override

@@ -11,7 +11,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class TalhaoApplication {
 
     public static void main(String[] args) {
-
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         
         // Inicializa a aplicação Spring Boot
