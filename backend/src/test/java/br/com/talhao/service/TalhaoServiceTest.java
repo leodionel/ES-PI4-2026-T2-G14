@@ -18,10 +18,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import br.com.talhao.dto.TalhaoRequest;
 import br.com.talhao.dto.TalhaoResponse;
-import br.com.talhao.model.AnaliseSolo;
 import br.com.talhao.model.Plantio;
 import br.com.talhao.model.Propriedade;
 import br.com.talhao.model.Talhao;
+import br.com.talhao.repository.AnaliseSoloRepository;
 import br.com.talhao.repository.PropriedadeRepository;
 import br.com.talhao.repository.TalhaoRepository;
 
@@ -40,6 +40,9 @@ class TalhaoServiceTest {
     private PropriedadeRepository propriedadeRepository;
 
     @Mock
+    private AnaliseSoloRepository analiseSoloRepository;
+
+    @Mock
     private MongoTemplate mongoTemplate;
 
     @InjectMocks
@@ -51,7 +54,7 @@ class TalhaoServiceTest {
     private final Propriedade propriedadeDaMaria =
             new Propriedade("p2", "u2", "Sitio Aurora", "Piracicaba");
 
-    // Talhao com 1 safra e 2 analises
+    // Talhao com 1 safra (as analises ficam em colecao propria)
     private Talhao talhaoDoJoao() {
         return new Talhao(
                 "t1",
@@ -59,11 +62,7 @@ class TalhaoServiceTest {
                 "Talhão 04",
                 42.8,
                 Instant.now(),
-                List.of(new Plantio("pl1", "soja", null, null)),
-                List.of(
-                        new AnaliseSolo("a1", null, 5.3, 30, 2.0, 55),
-                        new AnaliseSolo("a2", null, 5.5, 32, 2.2, 58)
-                )
+                List.of(new Plantio("pl1", "soja", null, null))
         );
     }
 
@@ -129,6 +128,7 @@ class TalhaoServiceTest {
                 .thenReturn(List.of(propriedadeDoJoao));
         when(talhaoRepository.findByIdAndPropriedadeId("t1", "p1"))
                 .thenReturn(Optional.of(talhaoDoJoao()));
+        when(analiseSoloRepository.countByTalhaoId("t1")).thenReturn(2L);
 
         TalhaoResponse resposta = talhaoService.buscar("t1", "u1");
 
@@ -170,6 +170,7 @@ class TalhaoServiceTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, erro.getStatusCode());
         verify(talhaoRepository, never()).delete(any());
+        verify(analiseSoloRepository, never()).deleteByTalhaoId(any());
     }
 
     // TESTE 7 - O nome pode ser digitado em outra caixa e com espacos
@@ -186,6 +187,8 @@ class TalhaoServiceTest {
         talhaoService.excluir("t1", "u1", "  TALHÃO 04 ");
 
         verify(talhaoRepository).delete(talhao);
+        // As analises do talhao tambem sao removidas
+        verify(analiseSoloRepository).deleteByTalhaoId("t1");
     }
 
     // TESTE 8 - Um usuario nao exclui o talhao de outro
