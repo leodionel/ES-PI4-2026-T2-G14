@@ -14,11 +14,9 @@ public record Talhao(
         String nome,
         double areaHa,
         Instant criadoEm,
-        List<Plantio> plantios,
-        List<AnaliseSolo> analises) {
+        List<Plantio> plantios) {
 
     public Talhao {                              // $push falha se o campo for null
         plantios = plantios == null ? List.of() : plantios;
-        analises = analises == null ? List.of() : analises;
     }
 }
