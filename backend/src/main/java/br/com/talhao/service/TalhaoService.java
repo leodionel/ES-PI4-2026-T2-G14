@@ -17,6 +17,7 @@ import br.com.talhao.dto.TalhaoRequest;
 import br.com.talhao.dto.TalhaoResponse;
 import br.com.talhao.model.Propriedade;
 import br.com.talhao.model.Talhao;
+import br.com.talhao.repository.AnaliseSoloRepository;
 import br.com.talhao.repository.PropriedadeRepository;
 import br.com.talhao.repository.TalhaoRepository;
 
@@ -27,16 +28,19 @@ public class TalhaoService {
 
     private final TalhaoRepository talhaoRepository;
     private final PropriedadeRepository propriedadeRepository;
+    private final AnaliseSoloRepository analiseSoloRepository;
     private final MongoTemplate mongoTemplate;
 
     // Injecao de dependencias pelo Spring Boot
     public TalhaoService(
             TalhaoRepository talhaoRepository,
             PropriedadeRepository propriedadeRepository,
+            AnaliseSoloRepository analiseSoloRepository,
             MongoTemplate mongoTemplate) {
 
         this.talhaoRepository = talhaoRepository;
         this.propriedadeRepository = propriedadeRepository;
+        this.analiseSoloRepository = analiseSoloRepository;
         this.mongoTemplate = mongoTemplate;
     }
 
@@ -49,14 +53,13 @@ public class TalhaoService {
                         "Cadastre a propriedade antes de criar talhoes"
                 ));
 
-        // Listas de plantios e analises comecam vazias
+        // A lista de plantios comeca vazia; as analises ficam em colecao propria
         Talhao talhao = new Talhao(
                 null,
                 propriedade.id(),
                 dados.nome().trim(),
                 dados.areaHa(),
                 Instant.now(),
-                List.of(),
                 List.of()
         );
 
@@ -83,6 +86,11 @@ public class TalhaoService {
     // DETALHAR UM TALHAO
     public TalhaoResponse buscar(String id, String usuarioId) {
         return paraResponse(talhaoDoUsuario(id, usuarioId));
+    }
+
+    // BUSCAR O TALHAO COMPLETO (USADO POR OUTROS SERVICES)
+    public Talhao buscarEntidade(String id, String usuarioId) {
+        return talhaoDoUsuario(id, usuarioId);
     }
 
     // EDITAR NOME E AREA DE UM TALHAO
@@ -122,7 +130,9 @@ public class TalhaoService {
             );
         }
 
+        // Remove o talhao e, em seguida, as analises dele
         talhaoRepository.delete(talhao);
+        analiseSoloRepository.deleteByTalhaoId(talhao.id());
     }
 
     // BUSCAR A PROPRIEDADE DO USUARIO
@@ -162,7 +172,7 @@ public class TalhaoService {
                 talhao.areaHa(),
                 talhao.criadoEm(),
                 talhao.plantios().size(),
-                talhao.analises().size()
+                (int) analiseSoloRepository.countByTalhaoId(talhao.id())
         );
     }
 }

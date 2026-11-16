@@ -21,4 +21,7 @@ public interface TalhaoRepository
             String id,
             String propriedadeId
     );
+
+    // Informa se a propriedade possui ao menos um talhao
+    boolean existsByPropriedadeId(String propriedadeId);
 }
