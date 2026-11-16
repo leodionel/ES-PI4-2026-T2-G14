@@ -5,11 +5,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.com.talhao.dto.AtualizarPerfilRequest;
 import br.com.talhao.dto.CadastroUsuarioRequest;
 import br.com.talhao.dto.LoginRequest;
 import br.com.talhao.dto.LoginResponse;
@@ -34,13 +36,12 @@ public class UsuarioController {
         this.jwtService = jwtService;
     }
 
-    // CADASTRO DE USUARIO
+    // CADASTRAR USUARIO
     @PostMapping("/cadastro")
     public ResponseEntity<UsuarioResponse> cadastrar(
             @Valid @RequestBody CadastroUsuarioRequest dados) {
 
-        UsuarioResponse usuario =
-                usuarioService.cadastrar(dados);
+        UsuarioResponse usuario = usuarioService.cadastrar(dados);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -52,18 +53,16 @@ public class UsuarioController {
     public ResponseEntity<LoginResponse> login(
             @Valid @RequestBody LoginRequest dados) {
 
-        UsuarioResponse usuario =
-                usuarioService.login(dados);
+        UsuarioResponse usuario = usuarioService.login(dados);
 
         String token = jwtService.gerarToken(usuario.id());
 
-        LoginResponse resposta =
-                new LoginResponse(token, usuario);
+        LoginResponse resposta = new LoginResponse(token, usuario);
 
         return ResponseEntity.ok(resposta);
     }
 
-    // BUSCAR PERFIL DO USUARIO AUTENTICADO
+    // CONSULTAR PERFIL AUTENTICADO
     @GetMapping("/me")
     public ResponseEntity<UsuarioResponse> meuPerfil(
             @RequestAttribute("usuarioIdAutenticado")
@@ -71,6 +70,19 @@ public class UsuarioController {
 
         UsuarioResponse usuario =
                 usuarioService.buscarPerfil(usuarioId);
+
+        return ResponseEntity.ok(usuario);
+    }
+
+    // EDITAR PERFIL AUTENTICADO
+    @PutMapping("/me")
+    public ResponseEntity<UsuarioResponse> atualizarPerfil(
+            @RequestAttribute("usuarioIdAutenticado")
+            String usuarioId,
+            @Valid @RequestBody AtualizarPerfilRequest dados) {
+
+        UsuarioResponse usuario =
+                usuarioService.atualizarPerfil(usuarioId, dados);
 
         return ResponseEntity.ok(usuario);
     }

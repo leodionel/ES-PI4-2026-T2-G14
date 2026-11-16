@@ -10,6 +10,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import br.com.talhao.dto.AtualizarPerfilRequest;
 import br.com.talhao.dto.CadastroUsuarioRequest;
 import br.com.talhao.dto.LoginRequest;
 import br.com.talhao.dto.UsuarioResponse;
@@ -97,7 +98,7 @@ public class UsuarioService {
         return converterParaResponse(usuario);
     }
 
-    // BUSCAR PERFIL DO USUARIO LOGADO
+    // CONSULTAR PERFIL DO USUARIO LOGADO
     public UsuarioResponse buscarPerfil(String usuarioId) {
 
         Usuario usuario = usuarioRepository.findById(usuarioId)
@@ -109,7 +110,36 @@ public class UsuarioService {
         return converterParaResponse(usuario);
     }
 
-    // CONVERTER USUARIO PARA RESPOSTA SEM SENHA
+    // ATUALIZAR NOME E TELEFONE DO USUARIO LOGADO
+    public UsuarioResponse atualizarPerfil(
+            String usuarioId,
+            AtualizarPerfilRequest dados) {
+
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Usuário não encontrado"
+                ));
+
+        // Usuario e um record: criamos uma nova instancia
+        // preservando ID, email, senha e data de criacao.
+        Usuario usuarioAtualizado = new Usuario(
+                usuario.id(),
+                dados.nome().trim(),
+                usuario.email(),
+                dados.telefone(),
+                usuario.senhaHash(),
+                usuario.criadoEm()
+        );
+
+        // Salva as alteracoes reais no MongoDB.
+        Usuario usuarioSalvo =
+                usuarioRepository.save(usuarioAtualizado);
+
+        return converterParaResponse(usuarioSalvo);
+    }
+
+    // RETORNAR DADOS DO USUARIO SEM A SENHA
     private UsuarioResponse converterParaResponse(Usuario usuario) {
 
         return new UsuarioResponse(
