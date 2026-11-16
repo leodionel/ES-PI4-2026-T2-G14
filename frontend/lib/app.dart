@@ -1,8 +1,10 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/theme/app_theme.dart';
 import 'data/repositories/auth_repository.dart';
+import 'telas/cadastro_screen.dart';
 import 'telas/dashboard_screen.dart';
 import 'telas/login.dart';
 import 'telas/recuperacao_senha.dart';
@@ -16,20 +18,25 @@ class App extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Prontuário Digital do Talhão',
       theme: AppTheme.claro,
+
       home: Consumer<AuthRepository>(
         builder: (context, auth, child) {
           // Verifica se existe uma sessão JWT salva.
           if (auth.iniciando) {
             return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
             );
           }
 
-          // Login realizado: abre o dashboard.
+          // Usuário autenticado: abre o Dashboard.
           if (auth.autenticado) {
             return Scaffold(
               appBar: AppBar(
-                title: const Text('Prontuário Digital do Talhão'),
+                title: const Text(
+                  'Prontuário Digital do Talhão',
+                ),
                 actions: [
                   TextButton.icon(
                     onPressed: () async {
@@ -44,12 +51,40 @@ class App extends StatelessWidget {
             );
           }
 
-          // Usuário não autenticado: abre o login.
+          // Usuário sem sessão: abre o Login.
           return Login(
+            // CADASTRO DE USUÁRIO
+            aoCriarConta: () async {
+              final cadastrado =
+                  await Navigator.of(context).push<bool>(
+                MaterialPageRoute<bool>(
+                  builder: (_) =>
+                      const CadastroScreen(),
+                ),
+              );
+
+              if (cadastrado == true &&
+                  context.mounted) {
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Conta criada com sucesso! '
+                      'Faça login para continuar.',
+                    ),
+                    backgroundColor:
+                        Color(0xFF4A5D23),
+                  ),
+                );
+              }
+            },
+
+            // RECUPERAÇÃO DE SENHA
             aoRecuperarSenha: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => const RecuperacaoSenha(),
+                  builder: (_) =>
+                      const RecuperacaoSenha(),
                 ),
               );
             },
