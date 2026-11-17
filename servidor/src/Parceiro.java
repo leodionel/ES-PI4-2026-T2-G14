@@ -82,8 +82,14 @@ public class Parceiro implements AutoCloseable {
             return ObjectInputFilter.Status.UNDECIDED;
         }
 
-        // Nosso protocolo nao utiliza objetos do tipo array
+        // O unico array do protocolo e byte[] (corpo das requisicoes)
         if (classe.isArray()) {
+
+            if (classe == byte[].class
+                    && informacao.arrayLength() <= MAX_BYTES) {
+                return ObjectInputFilter.Status.ALLOWED;
+            }
+
             return ObjectInputFilter.Status.REJECTED;
         }
 
@@ -95,6 +101,8 @@ public class Parceiro implements AutoCloseable {
                 || classe == RespostaDeStatus.class
                 || classe == PedidoDeConsulta.class
                 || classe == RespostaDeConsulta.class
+                || classe == PedidoRequisicao.class
+                || classe == RespostaRequisicao.class
                 || classe == PedidoDeConsulta.TipoConsulta.class
                 || classe == Enum.class
                 || classe == String.class) {
