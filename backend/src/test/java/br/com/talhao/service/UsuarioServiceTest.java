@@ -27,6 +27,21 @@ import static org.mockito.Mockito.*;
 // Testa as regras de negocio sem utilizar um MongoDB real
 @ExtendWith(MockitoExtension.class)
 class UsuarioServiceTest {
+    @Test
+    void perfilConsultaDadosAtuaisDoBanco() {
+        when(usuarioRepository.findById("usuario-1")).thenReturn(Optional.of(new Usuario(
+                "usuario-1", "Maria Atualizada", "maria@example.com", "19999999999", "hash-secreto", Instant.now())));
+        UsuarioResponse resposta = usuarioService.buscarAutenticado("usuario-1");
+        assertEquals("Maria Atualizada", resposta.nome());
+        verify(usuarioRepository).findById("usuario-1");
+    }
+
+    @Test
+    void perfilRejeitaUsuarioRemovido() {
+        when(usuarioRepository.findById("removido")).thenReturn(Optional.empty());
+        var erro = assertThrows(ResponseStatusException.class, () -> usuarioService.buscarAutenticado("removido"));
+        assertEquals(HttpStatus.UNAUTHORIZED, erro.getStatusCode());
+    }
 
     // Simula o repositorio de usuarios
     @Mock

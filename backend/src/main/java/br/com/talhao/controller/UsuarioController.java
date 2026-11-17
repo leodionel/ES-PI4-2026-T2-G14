@@ -4,6 +4,8 @@ package br.com.talhao.controller;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,6 +34,12 @@ public class UsuarioController {
 
         this.usuarioService = usuarioService;
         this.jwtService = jwtService;
+    }
+
+    // Perfil atual, identificado exclusivamente pelo token autenticado.
+    @GetMapping("/me")
+    public ResponseEntity<UsuarioResponse> perfil(@RequestAttribute("usuarioIdAutenticado") String usuarioId) {
+        return ResponseEntity.ok(usuarioService.buscarAutenticado(usuarioId));
     }
 
     // Endpoint para cadastrar um novo usuario

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'app.dart';
 import 'data/repositories/auth_repository.dart';
+import 'data/repositories/dados_repository.dart';
 import 'data/repositories/auth_repository_remote.dart';
 import 'data/services/api_client.dart';
 import 'data/services/token_storage.dart';
@@ -22,6 +23,12 @@ void main() {
         ),
 
         Provider<TokenStorage>(create: (_) => TokenStorage()),
+        Provider<DadosRepository>(
+          create: (context) => DadosRepository(
+            api: context.read<ApiClient>(),
+            tokens: context.read<TokenStorage>(),
+          ),
+        ),
 
         ChangeNotifierProvider<AuthRepository>(
           create: (context) {

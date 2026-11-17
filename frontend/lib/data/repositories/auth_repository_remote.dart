@@ -1,4 +1,5 @@
 import '../../core/app_exception.dart';
+import '../../domain/models/usuario.dart';
 import '../services/api_client.dart';
 import '../services/token_storage.dart';
 import 'auth_repository.dart';
@@ -17,6 +18,10 @@ class AuthRepositoryRemote extends AuthRepository {
 
   bool _iniciando = false;
   bool _autenticado = false;
+  Usuario? _usuario;
+
+  @override
+  Usuario? get usuario => _usuario;
 
   @override
   bool get iniciando => _iniciando;
@@ -28,6 +33,7 @@ class AuthRepositoryRemote extends AuthRepository {
   @override
   Future<void> restaurarSessao() async {
     _iniciando = true;
+    _usuario = null;
     notifyListeners();
 
     try {
@@ -40,7 +46,8 @@ class AuthRepositoryRemote extends AuthRepository {
 
       try {
         // Confirma a validade do token no backend.
-        await _apiClient.get('/api/talhoes', token: token);
+        final perfil = await _apiClient.get('/api/usuarios/me', token: token);
+        _usuario = Usuario.fromJson(Map<String, dynamic>.from(perfil as Map));
 
         _autenticado = true;
       } on AppException catch (erro) {
@@ -62,6 +69,8 @@ class AuthRepositoryRemote extends AuthRepository {
   // Realiza o login com dados reais.
   @override
   Future<void> entrar(String email, String senha) async {
+    _usuario = null;
+    _autenticado = false;
     final resposta = await _apiClient.post('/api/usuarios/login', {
       'email': email.trim(),
       'senha': senha,
@@ -77,6 +86,10 @@ class AuthRepositoryRemote extends AuthRepository {
       );
     }
 
+    final usuario = Usuario.fromJson(
+      Map<String, dynamic>.from(resposta['usuario'] as Map),
+    );
+
     // Armazena a sessão do usuário.
     try {
       await _tokenStorage.salvarToken(token);
@@ -91,6 +104,7 @@ class AuthRepositoryRemote extends AuthRepository {
 
     // Atualiza o estado de autenticação.
     _autenticado = true;
+    _usuario = usuario;
     _iniciando = false;
 
     notifyListeners();
@@ -103,6 +117,7 @@ class AuthRepositoryRemote extends AuthRepository {
       await _tokenStorage.apagarToken();
     } finally {
       _autenticado = false;
+      _usuario = null;
       notifyListeners();
     }
   }

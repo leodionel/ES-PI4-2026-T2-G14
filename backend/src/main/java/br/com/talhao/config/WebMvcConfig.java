@@ -24,6 +24,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(
                 new JwtAuthInterceptor(jwtDecoder)
         ).addPathPatterns(
+                "/api/usuarios/me",
 
                 // Rotas de talhoes e plantios
                 "/api/talhoes",

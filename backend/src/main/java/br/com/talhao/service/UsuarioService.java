@@ -32,6 +32,13 @@ public class UsuarioService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    // Busca os dados atuais da conta sem expor a senha.
+    public UsuarioResponse buscarAutenticado(String usuarioId) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario nao encontrado"));
+        return new UsuarioResponse(usuario.id(), usuario.nome(), usuario.email(), usuario.telefone(), usuario.criadoEm());
+    }
+
     // Realiza o cadastro de um novo usuario
     public UsuarioResponse cadastrar(CadastroUsuarioRequest dados) {
 

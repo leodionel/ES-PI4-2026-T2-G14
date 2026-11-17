@@ -1,53 +1,78 @@
+import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../../data/repositories/dados_repository.dart';
+import '../widgets/pagina_dados.dart';
 
 class PdfExportService {
-  static Future<void> exportarProntuarioTalhao() async {
+  static Future<Uint8List> gerar(DadosTalhao dados) async {
     final pdf = pw.Document();
-
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
+        maxPages: 20 + dados.plantios.length + dados.analises.length * 2,
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text('Prontuário Digital do Talhão', 
-                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)),
-              pw.SizedBox(height: 8),
-              pw.Text('Fazenda Santa Clara', style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
-              pw.SizedBox(height: 24),
-              
-              pw.Text('Talhão 04 - Soja', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-              pw.Text('Área: 42,8 hectares'),
-              pw.Text('Status: Saudável'),
-              pw.SizedBox(height: 24),
-
-              pw.Text('Análise de Solo', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-              pw.Divider(),
-              pw.Text('pH do solo: 6,2 (Ideal)'),
-              pw.Text('Matéria orgânica: 3,1% (Adequado)'),
-              pw.Text('Nitrogênio: Baixo (Atenção na próxima safra)'),
-              pw.SizedBox(height: 24),
-
-              pw.Text('Histórico Cronológico', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-              pw.Divider(),
-              pw.Bullet(text: '12 JAN 2026 - Praga identificada: Percevejo-marrom (Nível 1,8 insetos/m)'),
-              pw.SizedBox(height: 8),
-              pw.Bullet(text: '15 NOV 2025 - Plantio de Soja (Cultivar BMX Zeus IPRO)'),
-              pw.SizedBox(height: 8),
-              pw.Bullet(text: '28 OUT 2025 - Colheita de Milho'),
-            ],
-          );
-        },
+        margin: const pw.EdgeInsets.all(40),
+        footer: (context) =>
+            pw.Text('Página ${context.pageNumber} de ${context.pagesCount}'),
+        build: (_) => [
+          pw.Header(level: 0, text: 'Prontuário Digital do Talhão'),
+          pw.Text(
+            'Propriedade: ${dados.propriedade?['nome'] ?? 'Não informada'}',
+          ),
+          pw.Text(
+            'Localização: ${dados.propriedade?['localizacao'] ?? 'Não informada'}',
+          ),
+          pw.Header(level: 1, text: dados.nome),
+          pw.Text('Área: ${numeroDado(dados.talhao['areaHa'])} ha'),
+          pw.Text('Cultura atual: ${dados.culturaAtual}'),
+          pw.Text('Status do solo: ${statusDado(dados.status['status'])}'),
+          for (final motivo in dados.status['motivos'] as List? ?? [])
+            pw.Text('$motivo'),
+          pw.Header(level: 1, text: 'Culturas e safras'),
+          if (dados.plantios.isEmpty) pw.Text('Nenhuma safra cadastrada.'),
+          for (final p in dados.plantios)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 12),
+              child: pw.Text(
+                '${p['culturaNome']} | Plantio: ${dataDado(p['dataPlantio'])} | Colheita: ${p['dataColheita'] == null ? 'Em aberto' : dataDado(p['dataColheita'])}',
+              ),
+            ),
+          pw.Header(level: 1, text: 'Análises de solo'),
+          if (dados.analises.isEmpty) pw.Text('Nenhuma análise cadastrada.'),
+          for (final a in dados.analises.reversed)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 12),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'Coleta: ${dataDado(a['dataColeta'])}',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  ),
+                  pw.Text(
+                    'pH (CaCl2): ${numeroDado(a['ph'])} | P resina: ${numeroDado(a['fosforo'])} mg/dm³',
+                  ),
+                  pw.Text(
+                    'K: ${numeroDado(a['potassio'])} mmolc/dm³ | V: ${numeroDado(a['saturacaoBases'])}%',
+                  ),
+                  pw.Text(
+                    'Observações: ${a['observacoes'] ?? 'Não informadas'}',
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
+    return pdf.save();
+  }
 
+  static Future<void> exportarProntuarioTalhao(DadosTalhao dados) async {
+    final bytes = await gerar(dados);
     await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: 'Prontuario_Talhao_04.pdf',
+      onLayout: (_) async => bytes,
+      name: 'Prontuario_${dados.id}.pdf',
     );
   }
 }

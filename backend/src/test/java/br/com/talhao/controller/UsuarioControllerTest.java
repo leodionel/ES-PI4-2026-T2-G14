@@ -24,11 +24,32 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 // Testa as rotas HTTP do UsuarioController
 @WebMvcTest(UsuarioController.class)
 class UsuarioControllerTest {
+    @Test
+    void perfilExigeToken() throws Exception {
+        mockMvc.perform(get("/api/usuarios/me")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(usuarioService);
+    }
+
+    @Test
+    void perfilUsaSomenteUsuarioDoJwt() throws Exception {
+        when(jwtDecoder.decode("perfil-token")).thenReturn(org.springframework.security.oauth2.jwt.Jwt
+                .withTokenValue("perfil-token").header("alg", "HS256")
+                .claim("iss", "talhao-api").subject("usuario-1").build());
+        when(usuarioService.buscarAutenticado("usuario-1")).thenReturn(new UsuarioResponse(
+                "usuario-1", "Maria", "maria@example.com", "19999999999", Instant.now()));
+        mockMvc.perform(get("/api/usuarios/me").param("usuarioId", "usuario-2")
+                        .header("Authorization", "Bearer perfil-token"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value("usuario-1"))
+                .andExpect(jsonPath("$.nome").value("Maria"))
+                .andExpect(jsonPath("$.senhaHash").doesNotExist());
+        verify(usuarioService).buscarAutenticado("usuario-1");
+    }
 
     // Simula requisicoes HTTP sem iniciar um servidor real
     @Autowired

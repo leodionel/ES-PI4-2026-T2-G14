@@ -102,6 +102,33 @@ class ApiClient {
   }
 
   // Analisa o status HTTP e o JSON recebido.
+  Future<dynamic> put(
+    String caminho,
+    Map<String, dynamic> dados, {
+    String? token,
+  }) async {
+    try {
+      final resposta = await _client
+          .put(
+            _criarUri(caminho),
+            headers: _cabecalhos(token),
+            body: jsonEncode(dados),
+          )
+          .timeout(_tempoLimite);
+      return _processarResposta(resposta);
+    } on TimeoutException {
+      throw const AppException(
+        tipo: TipoErro.rede,
+        mensagem: 'O servidor demorou para responder.',
+      );
+    } on http.ClientException {
+      throw const AppException(
+        tipo: TipoErro.rede,
+        mensagem: 'Não foi possível conectar ao servidor.',
+      );
+    }
+  }
+
   dynamic _processarResposta(http.Response resposta) {
     final codigo = resposta.statusCode;
 
