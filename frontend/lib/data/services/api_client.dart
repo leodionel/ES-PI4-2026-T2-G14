@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/app_exception.dart';
@@ -10,12 +11,18 @@ class ApiClient {
   ApiClient({http.Client? client, String? baseUrl})
     : _client = client ?? http.Client(),
       _baseUrl =
-          (baseUrl ??
-                  const String.fromEnvironment(
-                    'API_URL',
-                    defaultValue: 'http://localhost:8081',
-                  ))
+          (baseUrl ?? _urlPadrao())
               .replaceFirst(RegExp(r'/+$'), '');
+
+  static String _urlPadrao() {
+    const urlConfigurada = String.fromEnvironment('API_URL');
+    if (urlConfigurada.isNotEmpty) return urlConfigurada;
+
+    // No emulador Android, localhost aponta para o próprio emulador.
+    return !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+        ? 'http://10.0.2.2:8081'
+        : 'http://localhost:8081';
+  }
 
   final http.Client _client;
   final String _baseUrl;
