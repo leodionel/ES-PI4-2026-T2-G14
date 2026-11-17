@@ -27,6 +27,22 @@ public class RelatorioController {
         this.relatorioPdfService = relatorioPdfService;
     }
 
+    // Exporta o historico completo de um talhao do usuario autenticado
+    @GetMapping("/talhao/{id}/pdf")
+    public ResponseEntity<byte[]> baixarProntuarioTalhao(
+            @PathVariable String id,
+            @RequestAttribute("usuarioIdAutenticado") String usuarioId) {
+
+        byte[] pdf = relatorioPdfService.gerarProntuarioTalhao(usuarioId, id);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"prontuario-talhao.pdf\"")
+                .contentLength(pdf.length)
+                .body(pdf);
+    }
+
     // Gera e disponibiliza o relatorio PDF de uma propriedade
     @GetMapping("/propriedade/{id}/pdf")
     public ResponseEntity<byte[]> baixarRelatorio(
