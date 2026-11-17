@@ -1,109 +1,115 @@
 import 'dart:async';
 import 'dart:convert';
-
-import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'dart:typed_data';
 
 import '../../core/app_exception.dart';
+import 'serializacao_java.dart';
+import 'servidor_socket.dart';
 
-// Responsável pela comunicação HTTP com o backend Java.
+// Responsável pela comunicação com o backend.
+//
+// O aplicativo não fala HTTP com a API: cada chamada vai por sockets ao
+// servidor Java, que encaminha a requisição ao Spring Boot e devolve a
+// resposta. A interface (get, post, put, delete) é a mesma de uma API HTTP.
 class ApiClient {
-  ApiClient({http.Client? client, String? baseUrl})
-    : _client = client ?? http.Client(),
-      _baseUrl =
-          (baseUrl ??
-                  const String.fromEnvironment(
-                    'API_URL',
-                    defaultValue: 'http://localhost:8081',
-                  ))
-              .replaceFirst(RegExp(r'/+$'), '');
+  ApiClient({ServidorSocket? servidor})
+    : _servidor = servidor ?? ServidorSocket();
 
-  final http.Client _client;
-  final String _baseUrl;
+  final ServidorSocket _servidor;
 
-  static const Duration _tempoLimite = Duration(seconds: 15);
-
-  // Monta o endereço completo da API.
-  Uri _criarUri(String caminho) {
-    final rota = caminho.startsWith('/') ? caminho : '/$caminho';
-
-    return Uri.parse('$_baseUrl$rota');
+  // Busca dados do backend.
+  Future<dynamic> get(String caminho, {String? token}) {
+    return _chamar('GET', caminho, token: token);
   }
 
-  // Monta os cabeçalhos da requisição.
-  Map<String, String> _cabecalhos(String? token) {
-    return {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-    };
-  }
-
-  // Envia requisições POST para o backend.
+  // Cria um registro.
   Future<Map<String, dynamic>> post(
     String caminho,
     Map<String, dynamic> dados, {
     String? token,
   }) async {
+    final resultado = await _chamar(
+      'POST',
+      caminho,
+      dados: dados,
+      token: token,
+    );
+
+    return _comoMapa(resultado);
+  }
+
+  // Altera um registro.
+  Future<Map<String, dynamic>> put(
+    String caminho,
+    Map<String, dynamic> dados, {
+    String? token,
+  }) async {
+    final resultado = await _chamar('PUT', caminho, dados: dados, token: token);
+
+    return _comoMapa(resultado);
+  }
+
+  // Exclui um registro. Alguns endpoints exigem confirmação no corpo.
+  Future<void> delete(
+    String caminho, {
+    Map<String, dynamic>? dados,
+    String? token,
+  }) async {
+    await _chamar('DELETE', caminho, dados: dados, token: token);
+  }
+
+  Map<String, dynamic> _comoMapa(dynamic resultado) {
+    if (resultado is Map<String, dynamic>) {
+      return resultado;
+    }
+
+    throw const AppException(
+      tipo: TipoErro.servidor,
+      mensagem: 'Resposta inesperada do servidor.',
+    );
+  }
+
+  Future<dynamic> _chamar(
+    String metodo,
+    String caminho, {
+    Map<String, dynamic>? dados,
+    String? token,
+  }) async {
     try {
-      final resposta = await _client
-          .post(
-            _criarUri(caminho),
-            headers: _cabecalhos(token),
-            body: jsonEncode(dados),
-          )
-          .timeout(_tempoLimite);
-
-      final resultado = _processarResposta(resposta);
-
-      if (resultado is Map<String, dynamic>) {
-        return resultado;
-      }
-
-      throw const AppException(
-        tipo: TipoErro.servidor,
-        mensagem: 'Resposta inesperada do servidor.',
+      final resposta = await _servidor.enviar(
+        metodo: metodo,
+        caminho: caminho.startsWith('/') ? caminho : '/$caminho',
+        token: token ?? '',
+        corpo: dados == null
+            ? null
+            : Uint8List.fromList(utf8.encode(jsonEncode(dados))),
       );
+
+      return _processarResposta(resposta);
     } on TimeoutException {
       throw const AppException(
         tipo: TipoErro.rede,
-        mensagem:
-            'O servidor demorou para responder. '
-            'Tente novamente.',
+        mensagem: 'O servidor demorou para responder. Tente novamente.',
       );
-    } on http.ClientException {
+    } on SocketException {
       throw const AppException(
         tipo: TipoErro.rede,
         mensagem:
             'Não foi possível conectar ao servidor. '
             'Verifique sua conexão.',
       );
-    }
-  }
-
-  // Busca dados do backend.
-  Future<dynamic> get(String caminho, {String? token}) async {
-    try {
-      final resposta = await _client
-          .get(_criarUri(caminho), headers: _cabecalhos(token))
-          .timeout(_tempoLimite);
-
-      return _processarResposta(resposta);
-    } on TimeoutException {
+    } on FormatoInvalidoException {
       throw const AppException(
-        tipo: TipoErro.rede,
-        mensagem: 'O servidor demorou para responder.',
-      );
-    } on http.ClientException {
-      throw const AppException(
-        tipo: TipoErro.rede,
-        mensagem: 'Não foi possível conectar ao servidor.',
+        tipo: TipoErro.servidor,
+        mensagem: 'O servidor retornou uma resposta inválida.',
       );
     }
   }
 
   // Analisa o status HTTP e o JSON recebido.
-  dynamic _processarResposta(http.Response resposta) {
-    final codigo = resposta.statusCode;
+  dynamic _processarResposta(RespostaServidor resposta) {
+    final codigo = resposta.status;
 
     if (codigo == 401) {
       throw const AppException(
@@ -133,12 +139,12 @@ class ApiClient {
       );
     }
 
-    if (resposta.bodyBytes.isEmpty) {
+    if (resposta.corpo.isEmpty) {
       return <String, dynamic>{};
     }
 
     try {
-      return jsonDecode(utf8.decode(resposta.bodyBytes));
+      return jsonDecode(utf8.decode(resposta.corpo));
     } on FormatException {
       throw const AppException(
         tipo: TipoErro.servidor,
@@ -147,8 +153,6 @@ class ApiClient {
     }
   }
 
-  // Libera os recursos HTTP.
-  void fechar() {
-    _client.close();
-  }
+  // Mantido para compatibilidade: não há conexão aberta para liberar.
+  void fechar() {}
 }
