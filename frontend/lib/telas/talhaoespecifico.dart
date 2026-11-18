@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'simulacao_rotacao.dart';
 
 class LinhaTempoScreen extends StatelessWidget {
   LinhaTempoScreen({super.key});
@@ -16,7 +17,7 @@ class LinhaTempoScreen extends StatelessWidget {
       body: Row(
         children: [
           // MENU LATERAL (SIDEBAR)
-          _buildSidebar(),
+          _buildSidebar(context),
           
           // CONTEÚDO PRINCIPAL
           Expanded(
@@ -142,7 +143,7 @@ class LinhaTempoScreen extends StatelessWidget {
 
   // --- WIDGETS AUXILIARES ---
 
-  Widget _buildSidebar() {
+  Widget _buildSidebar(BuildContext context) {
     return Container(
       width: 250,
       color: corCard,
@@ -156,7 +157,13 @@ class LinhaTempoScreen extends StatelessWidget {
           const SizedBox(height: 16),
           _buildMenuItem(Icons.dashboard, 'Dashboard'),
           _buildMenuItem(Icons.layers, 'Talhões', isActive: true),
-          _buildMenuItem(Icons.autorenew, 'Simulação de Rotação'),
+          _buildMenuItem(
+            Icons.autorenew,
+            'Simulação de Rotação',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const SimulacaoRotacao()),
+            ),
+          ),
           _buildMenuItem(Icons.person, 'Perfil'),
           const Spacer(),
           Container(
@@ -176,7 +183,7 @@ class LinhaTempoScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String title, {bool isActive = false}) {
+  Widget _buildMenuItem(IconData icon, String title, {bool isActive = false, VoidCallback? onTap}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -186,7 +193,7 @@ class LinhaTempoScreen extends StatelessWidget {
       child: ListTile(
         leading: Icon(icon, color: isActive ? corVerdeEscuro : Colors.black54),
         title: Text(title, style: TextStyle(color: isActive ? corVerdeEscuro : Colors.black87, fontWeight: isActive ? FontWeight.bold : FontWeight.normal)),
-        onTap: () {},
+        onTap: onTap,
       ),
     );
   }
