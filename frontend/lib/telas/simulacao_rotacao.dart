@@ -242,7 +242,7 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
 
   Widget _itemMenu(IconData icone, String texto, {bool selecionado = false}) {
     return Padding(
-      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Material(
         color: selecionado ? Colors.white : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
@@ -737,8 +737,8 @@ class _Marca extends StatelessWidget {
     return Row(
       children: [
         Container(
-        width: 36,
-        height: 36,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
             color: AppColors.verdeEscuro,
             borderRadius: BorderRadius.circular(7),
