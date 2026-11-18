@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'simulacao_rotacao.dart';
+import 'perfil_screen.dart';
 
 class LinhaTempoScreen extends StatelessWidget {
-  LinhaTempoScreen({super.key});
+  const LinhaTempoScreen({super.key});
 
   // Paleta de cores baseada no design
   final Color corFundo = const Color(0xFFF7F5EE);
@@ -11,37 +13,52 @@ class LinhaTempoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mobile = MediaQuery.sizeOf(context).width < 700;
     return Scaffold(
       backgroundColor: corFundo,
+      appBar: mobile
+          ? AppBar(
+              title: const Text('Talhão 04'),
+              backgroundColor: corCard,
+              foregroundColor: corVerdeEscuro,
+            )
+          : null,
+      drawer: mobile
+          ? Drawer(child: SafeArea(child: _buildSidebar(context)))
+          : null,
       body: Row(
         children: [
           // MENU LATERAL (SIDEBAR)
-          _buildSidebar(),
+          if (!mobile) _buildSidebar(context),
           
           // CONTEÚDO PRINCIPAL
           Expanded(
             child: Row(
               children: [
                 // Faixa branca decorativa do fundo (igual ao design)
-                Container(
-                  width: 120,
-                  color: Colors.white,
-                ),
+                if (!mobile) Container(width: 120, color: Colors.white),
                 Expanded(
                   child: Container(
                     color: corFundo,
                     child: Padding(
-                      padding: const EdgeInsets.only(top: 32.0, right: 32.0, bottom: 32.0),
+                      padding: EdgeInsets.only(
+                        top: mobile ? 16 : 32,
+                        right: mobile ? 16 : 32,
+                        bottom: mobile ? 16 : 32,
+                        left: mobile ? 16 : 0,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // CABEÇALHO
                           Transform.translate(
-                            offset: const Offset(-80, 0), // Ajuste para o texto sobrepor a faixa branca
+                            offset: Offset(mobile ? 0 : -80, 0),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
+                                Wrap(
+                                  spacing: 12,
+                                  runSpacing: 8,
                                   children: [
                                     Icon(Icons.arrow_back, size: 16, color: Colors.black54),
                                     const SizedBox(width: 4),
@@ -56,13 +73,12 @@ class LinhaTempoScreen extends StatelessWidget {
                                     Text(
                                       'Talhão 04 - Soja',
                                       style: TextStyle(
-                                        fontSize: 32,
+                                        fontSize: mobile ? 24 : 32,
                                         fontWeight: FontWeight.bold,
                                         color: corVerdeEscuro,
                                         fontFamily: 'Serif',
                                       ),
                                     ),
-                                    const SizedBox(width: 16),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                       decoration: BoxDecoration(
@@ -142,7 +158,7 @@ class LinhaTempoScreen extends StatelessWidget {
 
   // --- WIDGETS AUXILIARES ---
 
-  Widget _buildSidebar() {
+  Widget _buildSidebar(BuildContext context) {
     return Container(
       width: 250,
       color: corCard,
@@ -156,8 +172,20 @@ class LinhaTempoScreen extends StatelessWidget {
           const SizedBox(height: 16),
           _buildMenuItem(Icons.dashboard, 'Dashboard'),
           _buildMenuItem(Icons.layers, 'Talhões', isActive: true),
-          _buildMenuItem(Icons.autorenew, 'Simulação de Rotação'),
-          _buildMenuItem(Icons.person, 'Perfil'),
+          _buildMenuItem(
+            Icons.autorenew,
+            'Simulação de Rotação',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const SimulacaoRotacao()),
+            ),
+          ),
+          _buildMenuItem(
+            Icons.person,
+            'Perfil',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const PerfilScreen()),
+            ),
+          ),
           const Spacer(),
           Container(
             padding: const EdgeInsets.all(16),
@@ -176,7 +204,7 @@ class LinhaTempoScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String title, {bool isActive = false}) {
+  Widget _buildMenuItem(IconData icon, String title, {bool isActive = false, VoidCallback? onTap}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -186,7 +214,7 @@ class LinhaTempoScreen extends StatelessWidget {
       child: ListTile(
         leading: Icon(icon, color: isActive ? corVerdeEscuro : Colors.black54),
         title: Text(title, style: TextStyle(color: isActive ? corVerdeEscuro : Colors.black87, fontWeight: isActive ? FontWeight.bold : FontWeight.normal)),
-        onTap: () {},
+        onTap: onTap,
       ),
     );
   }

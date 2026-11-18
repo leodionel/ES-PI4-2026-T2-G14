@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/utils/pdf_export_service.dart';
+
 import '../data/services/api_client.dart';
 import '../data/services/token_storage.dart';
 
@@ -25,10 +27,13 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
 
   Map<String, dynamic>? _talhao;
   List<Map<String, dynamic>> _analises = [];
+  List<Map<String, dynamic>> _plantios = [];
 
   bool _carregando = true;
+  bool _exportandoPdf = false;
   String? _erro;
   String? _erroAnalises;
+  String? _erroPlantios;
 
   @override
   void initState() {
@@ -63,6 +68,7 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
       _carregando = true;
       _erro = null;
       _erroAnalises = null;
+      _erroPlantios = null;
     });
 
     try {
@@ -80,6 +86,25 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
 
       final detalhe = Map<String, dynamic>.from(resposta);
 
+      // Buscar plantios registrados no talhao.
+      List<Map<String, dynamic>> plantios = [];
+      String? erroPlantios;
+      try {
+        final retornoPlantios = await _api.get(
+          '/api/talhoes/${Uri.encodeComponent(id)}/plantios',
+          token: token,
+        );
+        if (retornoPlantios is! List) {
+          throw const FormatException(
+            'A API nao retornou a lista de plantios.',
+          );
+        }
+        plantios = retornoPlantios
+            .map((item) => Map<String, dynamic>.from(item as Map))
+            .toList();
+      } catch (e) {
+        erroPlantios = e.toString().replaceFirst('Exception: ', '');
+      }
       // Buscar análises de solo reais
       List<Map<String, dynamic>> analises = [];
       String? erroAnalises;
@@ -114,6 +139,8 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
       setState(() {
         _talhao = detalhe;
         _analises = analises;
+        _plantios = plantios;
+        _erroPlantios = erroPlantios;
         _erroAnalises = erroAnalises;
       });
     } catch (e) {
@@ -128,6 +155,31 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
           _carregando = false;
         });
       }
+    }
+  }
+
+  Future<void> _exportarPdf() async {
+    if (_talhao == null ||
+        _erroAnalises != null ||
+        _erroPlantios != null ||
+        _exportandoPdf) {
+      return;
+    }
+
+    setState(() => _exportandoPdf = true);
+    try {
+      await PdfExportService.exportarProntuarioTalhao(
+        talhao: _talhao!,
+        analises: _analises,
+        plantios: _plantios,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível gerar o PDF.')),
+      );
+    } finally {
+      if (mounted) setState(() => _exportandoPdf = false);
     }
   }
 
@@ -189,26 +241,41 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
 
   // EXIBIR INFORMAÇÕES SOBRE PLANTIOS
   void _mostrarPlantios() {
-    final total = _quantidade('totalPlantios');
-
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Plantios do talhão'),
-        content: Text(
-          total == 0
-              ? 'Nenhum plantio registrado neste talhão. '
-                    'O cadastro e o histórico de plantios '
-                    'ainda precisam ser integrados à API.'
-              : 'A API informa $total plantio(s) '
-                    'neste talhão, mas ainda não disponibiliza '
-                    'o histórico detalhado por este endpoint.',
+        title: const Text('Plantios do talh\u00e3o'),
+        content: SizedBox(
+          width: 540,
+          height: 360,
+          child: _erroPlantios != null
+              ? Center(
+                  child: Text('Falha ao carregar plantios: $_erroPlantios'),
+                )
+              : _plantios.isEmpty
+              ? const Center(
+                  child: Text('Nenhum plantio registrado neste talh\u00e3o.'),
+                )
+              : ListView.separated(
+                  itemCount: _plantios.length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final plantio = _plantios[index];
+                    final colheita = plantio['dataColheita'];
+                    return ListTile(
+                      leading: const Icon(Icons.grass),
+                      title: Text(_texto(plantio['culturaNome'])),
+                      subtitle: Text(
+                        'Plantio: ${_data(plantio['dataPlantio'])}\n'
+                        'Colheita: ${colheita == null ? 'Em andamento' : _data(colheita)}',
+                      ),
+                    );
+                  },
+                ),
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-            },
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Fechar'),
           ),
         ],
@@ -216,7 +283,6 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
     );
   }
 
-  // EXIBIR ANÁLISES DE SOLO REAIS
   void _mostrarAnalises() {
     showDialog<void>(
       context: context,
@@ -329,6 +395,17 @@ class _ProntuarioScreenState extends State<ProntuarioScreen> {
         backgroundColor: corCard,
         title: const Text('Prontuário do Talhão'),
         actions: [
+          IconButton(
+            onPressed:
+                _carregando ||
+                    _erroAnalises != null ||
+                    _erroPlantios != null ||
+                    _exportandoPdf
+                ? null
+                : _exportarPdf,
+            tooltip: 'Exportar prontuário em PDF',
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+          ),
           IconButton(
             onPressed: _carregando ? null : _carregarDados,
             tooltip: 'Atualizar dados',

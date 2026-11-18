@@ -32,6 +32,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 "/api/talhoes",
                 "/api/talhoes/**",
 
+                // Perfil do usuario autenticado
+                "/api/usuarios/me",
+
                 // Rotas do catalogo de culturas
                 "/api/culturas",
                 "/api/culturas/**",
