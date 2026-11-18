@@ -365,7 +365,14 @@ class DashboardScreen extends StatelessWidget {
           const SizedBox(height: 16),
 
           // DASHBOARD
-          _buildMenuItem(Icons.dashboard, 'Dashboard', isActive: true),
+          _buildMenuItem(
+            Icons.dashboard,
+            'Dashboard',
+            isActive: true,
+            onTap: () {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            },
+          ),
 
           // TALHÕES
           _buildMenuItem(

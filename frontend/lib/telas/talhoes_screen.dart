@@ -304,6 +304,13 @@ class _TalhoesScreenState extends State<TalhoesScreen> {
         backgroundColor: const Color(0xFFF0EBE1),
         actions: [
           IconButton(
+            onPressed: () {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            },
+            tooltip: 'Ir para o dashboard',
+            icon: const Icon(Icons.dashboard_outlined),
+          ),
+          IconButton(
             onPressed: _carregando ? null : _carregarTalhoes,
             tooltip: 'Atualizar lista',
             icon: const Icon(Icons.refresh),
