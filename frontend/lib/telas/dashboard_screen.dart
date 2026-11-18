@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'talhoes_screen.dart';
 import 'simulacao_rotacao_dados.dart';
+import 'perfil_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -20,13 +21,6 @@ class DashboardScreen extends StatelessWidget {
             TalhoesScreen(abrirCadastroAoEntrar: abrirCadastro),
       ),
     );
-  }
-
-  // Avisa sobre funcionalidades pendentes
-  void _mostrarAviso(BuildContext context, String tela) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$tela ainda não está integrada.')));
   }
 
   void _abrirSimulacao(BuildContext context) {
@@ -406,7 +400,9 @@ class DashboardScreen extends StatelessWidget {
             Icons.person,
             'Perfil',
             onTap: () {
-              _mostrarAviso(context, 'Perfil');
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const PerfilScreen()),
+              );
             },
           ),
 
