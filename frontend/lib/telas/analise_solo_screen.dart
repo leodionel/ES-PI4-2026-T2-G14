@@ -554,8 +554,9 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
                                                     vertical: 4,
                                                   ),
                                               decoration: BoxDecoration(
-                                                color: corVerdeClaro
-                                                    .withOpacity(0.25),
+                                                color: corVerdeClaro.withValues(
+                                                  alpha: 0.25,
+                                                ),
                                                 borderRadius:
                                                     BorderRadius.circular(12),
                                               ),
