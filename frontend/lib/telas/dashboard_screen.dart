@@ -30,17 +30,28 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final largura = MediaQuery.sizeOf(context).width;
     return Scaffold(
       backgroundColor: corFundo,
+      drawer: largura < 700
+          ? Drawer(child: _buildSidebar(context))
+          : null,
+      appBar: largura < 700
+          ? AppBar(
+              title: const Text('Prontuário Digital do Talhão'),
+              backgroundColor: corCard,
+              foregroundColor: corVerdeEscuro,
+            )
+          : null,
       body: Row(
         children: [
           // MENU LATERAL
-          _buildSidebar(context),
+          if (largura >= 700) _buildSidebar(context),
 
           // CONTEÚDO PRINCIPAL
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(32.0),
+              padding: EdgeInsets.all(largura < 700 ? 16.0 : 32.0),
               child: ListView(
                 children: [
                   // CABEÇALHO
@@ -579,3 +590,4 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 }
+
