@@ -217,14 +217,23 @@ class _CulturasSafrasScreenState extends State<CulturasSafrasScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final mobile = MediaQuery.sizeOf(context).width < 700;
     return Scaffold(
       backgroundColor: corFundo,
+      appBar: mobile
+          ? AppBar(
+              title: Text(widget.talhaoNome),
+              backgroundColor: corCard,
+              foregroundColor: corVerdeEscuro,
+            )
+          : null,
+      drawer: mobile ? Drawer(child: _buildSidebar()) : null,
       body: Row(
         children: [
-          _buildSidebar(),
+          if (!mobile) _buildSidebar(),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(32.0),
+              padding: EdgeInsets.all(mobile ? 16.0 : 32.0),
               child: ListView(
                 children: [
                   // NAVEGAÇÃO SUPERIOR
