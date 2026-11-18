@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'talhoes_screen.dart';
+import 'simulacao_rotacao_dados.dart';
+import 'perfil_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -21,26 +23,35 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  // Avisa sobre funcionalidades pendentes
-  void _mostrarAviso(BuildContext context, String tela) {
-    ScaffoldMessenger.of(
+  void _abrirSimulacao(BuildContext context) {
+    Navigator.push(
       context,
-    ).showSnackBar(SnackBar(content: Text('$tela ainda não está integrada.')));
+      MaterialPageRoute<void>(builder: (_) => const SimulacaoRotacao()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final largura = MediaQuery.sizeOf(context).width;
     return Scaffold(
       backgroundColor: corFundo,
+      drawer: largura < 700 ? Drawer(child: _buildSidebar(context)) : null,
+      appBar: largura < 700
+          ? AppBar(
+              title: const Text('Prontuário Digital do Talhão'),
+              backgroundColor: corCard,
+              foregroundColor: corVerdeEscuro,
+            )
+          : null,
       body: Row(
         children: [
           // MENU LATERAL
-          _buildSidebar(context),
+          if (largura >= 700) _buildSidebar(context),
 
           // CONTEÚDO PRINCIPAL
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(32.0),
+              padding: EdgeInsets.all(largura < 700 ? 16.0 : 32.0),
               child: ListView(
                 children: [
                   // CABEÇALHO
@@ -304,7 +315,7 @@ class DashboardScreen extends StatelessWidget {
 
                         ElevatedButton(
                           onPressed: () {
-                            _mostrarAviso(context, 'Simulação de Rotação');
+                            _abrirSimulacao(context);
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
@@ -380,7 +391,7 @@ class DashboardScreen extends StatelessWidget {
             Icons.autorenew,
             'Simulação de Rotação',
             onTap: () {
-              _mostrarAviso(context, 'Simulação de Rotação');
+              _abrirSimulacao(context);
             },
           ),
 
@@ -389,7 +400,9 @@ class DashboardScreen extends StatelessWidget {
             Icons.person,
             'Perfil',
             onTap: () {
-              _mostrarAviso(context, 'Perfil');
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const PerfilScreen()),
+              );
             },
           ),
 
