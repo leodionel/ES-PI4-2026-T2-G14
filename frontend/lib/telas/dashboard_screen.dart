@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'talhoes_screen.dart';
 import 'perfil_screen.dart';
@@ -403,17 +404,17 @@ class DashboardScreen extends StatelessWidget {
           ),
 
           // PERFIL
-          _buildMenuItem(
-            Icons.person,
-            'Perfil',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const PerfilScreen(),
-                ),
-              );
-            },
-          ),
+         _buildMenuItem(
+  Icons.person,
+  'Perfil',
+  onTap: () {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const PerfilScreen(),
+      ),
+    );
+  },
+),
 
           const Spacer(),
 
