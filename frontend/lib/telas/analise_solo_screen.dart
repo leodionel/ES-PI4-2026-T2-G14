@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'simulacao_rotacao.dart';
+import 'simulacao_rotacao_dados.dart';
 
 class AnaliseSoloScreen extends StatefulWidget {
   final String talhaoNome;
