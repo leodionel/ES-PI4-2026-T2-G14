@@ -44,4 +44,23 @@ public final class HistoricoTalhao {
                         && c.grupoP() != null)
                 .findFirst();
     }
+
+    // Plantio atual: o mais recente ja iniciado e sem colheita registrada.
+    // Se duas datas empatam, vale o plantio registrado por ultimo.
+    // Culturas fora do catalogo sao ignoradas.
+    public static Optional<Plantio> plantioAtual(
+            Talhao talhao,
+            Map<String, Cultura> catalogo,
+            LocalDate hoje) {
+
+        return talhao.plantios().stream()
+                .filter(p -> p.dataColheita() == null
+                        && p.dataPlantio() != null
+                        && !p.dataPlantio().isAfter(hoje)
+                        && catalogo.containsKey(p.culturaId()))
+                .reduce((anterior, atual) ->
+                        atual.dataPlantio().isBefore(anterior.dataPlantio())
+                                ? anterior
+                                : atual);
+    }
 }
