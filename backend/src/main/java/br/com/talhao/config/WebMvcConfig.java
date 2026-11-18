@@ -46,7 +46,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
                 // Rotas de relatorios PDF
                 "/api/relatorios",
-                "/api/relatorios/**"
+                "/api/relatorios/**",
+
+                // Dashboard da propriedade
+                "/api/dashboard",
+                "/api/dashboard/**"
         );
     }
 }
