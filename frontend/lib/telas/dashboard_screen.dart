@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'talhoes_screen.dart';
+import 'perfil_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -389,7 +390,11 @@ class DashboardScreen extends StatelessWidget {
             Icons.person,
             'Perfil',
             onTap: () {
-              _mostrarAviso(context, 'Perfil');
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const PerfilScreen(),
+                ),
+              );
             },
           ),
 
