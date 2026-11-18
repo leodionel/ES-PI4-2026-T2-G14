@@ -39,12 +39,21 @@ public class StatusSoloService {
     // STATUS DE UM TALHAO JA CARREGADO (usado tambem pela simulacao)
     public StatusSoloResponse calcular(Talhao talhao) {
 
+        Map<String, Cultura> catalogo = culturaService.listar().stream()
+                .collect(Collectors.toMap(Cultura::id, Function.identity()));
+
+        return calcular(talhao, catalogo);
+    }
+
+    // Igual ao anterior, mas com o catalogo ja carregado.
+    // Quem calcula varios talhoes de uma vez le o catalogo uma unica vez
+    public StatusSoloResponse calcular(
+            Talhao talhao,
+            Map<String, Cultura> catalogo) {
+
         AnaliseSolo ultima = analiseSoloRepository
                 .findFirstByTalhaoIdOrderByDataColetaDesc(talhao.id())
                 .orElse(null);
-
-        Map<String, Cultura> catalogo = culturaService.listar().stream()
-                .collect(Collectors.toMap(Cultura::id, Function.identity()));
 
         Cultura comercial = HistoricoTalhao
                 .ultimaComercial(talhao, catalogo, LocalDate.now())
