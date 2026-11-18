@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'simulacao_rotacao_dados.dart';
+import 'perfil_screen.dart';
 
 class AnaliseSoloScreen extends StatefulWidget {
   final String talhaoNome;
@@ -140,14 +142,23 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final mobile = MediaQuery.sizeOf(context).width < 700;
     return Scaffold(
       backgroundColor: corFundo,
+      appBar: mobile
+          ? AppBar(
+              title: Text(widget.talhaoNome),
+              backgroundColor: corCard,
+              foregroundColor: corVerdeEscuro,
+            )
+          : null,
+      drawer: mobile ? Drawer(child: _buildSidebar()) : null,
       body: Row(
         children: [
-          _buildSidebar(),
+          if (!mobile) _buildSidebar(),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(32.0),
+              padding: EdgeInsets.all(mobile ? 16.0 : 32.0),
               child: ListView(
                 children: [
                   // CABEÇALHO E NAVEGAÇÃO
@@ -552,8 +563,9 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
                                                     vertical: 4,
                                                   ),
                                               decoration: BoxDecoration(
-                                                color: corVerdeClaro
-                                                    .withOpacity(0.25),
+                                                color: corVerdeClaro.withValues(
+                                                  alpha: 0.25,
+                                                ),
                                                 borderRadius:
                                                     BorderRadius.circular(12),
                                               ),
@@ -690,8 +702,20 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
           const SizedBox(height: 16),
           _buildMenuItem(Icons.dashboard, 'Dashboard'),
           _buildMenuItem(Icons.layers, 'Talhões', isActive: true),
-          _buildMenuItem(Icons.autorenew, 'Simulação de Rotação'),
-          _buildMenuItem(Icons.person, 'Perfil'),
+          _buildMenuItem(
+            Icons.autorenew,
+            'Simulação de Rotação',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const SimulacaoRotacao()),
+            ),
+          ),
+          _buildMenuItem(
+            Icons.person,
+            'Perfil',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const PerfilScreen()),
+            ),
+          ),
           const Spacer(),
           Container(
             padding: const EdgeInsets.all(16),
@@ -722,7 +746,12 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String title, {bool isActive = false}) {
+  Widget _buildMenuItem(
+    IconData icon,
+    String title, {
+    bool isActive = false,
+    VoidCallback? onTap,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -738,7 +767,7 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
           ),
         ),
-        onTap: () {},
+        onTap: onTap,
       ),
     );
   }
