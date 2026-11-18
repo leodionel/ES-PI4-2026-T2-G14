@@ -1,3 +1,4 @@
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -35,45 +36,66 @@ class _PerfilScreenState extends State<PerfilScreen> {
 
     try {
       final token = await _tokenStorage.lerToken();
+
       if (token == null || token.isEmpty) {
         throw Exception('Sessão expirada. Faça login novamente.');
       }
 
-      final resposta = await _api.get('/api/usuarios/me', token: token);
+      final resposta = await _api.get(
+        '/api/usuarios/me',
+        token: token,
+      );
+
       if (resposta is! Map) {
-        throw const FormatException('A API não retornou os dados do perfil.');
+        throw const FormatException(
+          'A API não retornou os dados do perfil.',
+        );
       }
 
       if (mounted) {
-        setState(() => _perfil = Map<String, dynamic>.from(resposta));
+        setState(() {
+          _perfil = Map<String, dynamic>.from(resposta);
+        });
       }
     } catch (erro) {
       if (mounted) {
-        setState(() => _erro = erro.toString().replaceFirst('Exception: ', ''));
+        setState(() {
+          _erro = erro.toString().replaceFirst('Exception: ', '');
+        });
       }
     } finally {
       if (mounted) {
-        setState(() => _carregando = false);
+        setState(() {
+          _carregando = false;
+        });
       }
     }
   }
 
+  // Compatibilidade com respostas aninhadas ou planas da API.
   Map<String, dynamic> get _usuario {
     final usuario = _perfil?['usuario'];
-    if (usuario is Map) return Map<String, dynamic>.from(usuario);
+
+    if (usuario is Map) {
+      return Map<String, dynamic>.from(usuario);
+    }
+
     return _perfil ?? <String, dynamic>{};
   }
 
   Map<String, dynamic>? get _propriedade {
     final propriedade = _perfil?['propriedade'];
-    return propriedade is Map
-        ? Map<String, dynamic>.from(propriedade)
-        : null;
+
+    if (propriedade is Map) {
+      return Map<String, dynamic>.from(propriedade);
+    }
+
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final nome = _usuario['nome']?.toString() ?? '';
+    final nome = (_usuario['nome']?.toString() ?? '').trim();
 
     return Scaffold(
       backgroundColor: AppColors.fundo,
@@ -90,19 +112,19 @@ class _PerfilScreenState extends State<PerfilScreen> {
             child: _carregando
                 ? const Center(child: CircularProgressIndicator())
                 : _erro != null
-                ? _mensagemErro()
-                : ListView(
-                    children: [
-                      _cartaoPerfil(nome),
-                      if (_propriedade != null) ...[
-                        const SizedBox(height: 16),
-                        _cartaoPropriedade(_propriedade!),
-                      ] else ...[
-                        const SizedBox(height: 16),
-                        const Text('Nenhuma propriedade cadastrada.'),
-                      ],
-                    ],
-                  ),
+                    ? _mensagemErro()
+                    : ListView(
+                        children: [
+                          _cartaoPerfil(nome),
+                          const SizedBox(height: 16),
+                          if (_propriedade != null)
+                            _cartaoPropriedade(_propriedade!)
+                          else
+                            const Text(
+                              'Nenhuma propriedade cadastrada.',
+                            ),
+                        ],
+                      ),
           ),
         ),
       ),
@@ -110,11 +132,15 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 
   Widget _cartaoPerfil(String nome) {
-    final criadoEm = DateTime.tryParse(_usuario['criadoEm']?.toString() ?? '');
+    final criadoEm = DateTime.tryParse(
+      _usuario['criadoEm']?.toString() ?? '',
+    );
+
     final dataFormatada = criadoEm == null
         ? '—'
         : '${criadoEm.day.toString().padLeft(2, '0')}/'
-              '${criadoEm.month.toString().padLeft(2, '0')}/${criadoEm.year}';
+            '${criadoEm.month.toString().padLeft(2, '0')}/'
+            '${criadoEm.year}';
 
     return Card(
       color: AppColors.painel,
@@ -134,7 +160,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
                 radius: 36,
                 backgroundColor: const Color(0xFFE2EEE4),
                 child: Text(
-                  nome.trim().isEmpty ? '?' : nome.trim()[0].toUpperCase(),
+                  nome.isEmpty ? '?' : nome[0].toUpperCase(),
                   style: const TextStyle(
                     fontSize: 28,
                     color: AppColors.verdeEscuro,
@@ -155,9 +181,17 @@ class _PerfilScreenState extends State<PerfilScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            _campo(Icons.email_outlined, 'E-mail', _usuario['email']),
+            _campo(
+              Icons.email_outlined,
+              'E-mail',
+              _usuario['email'],
+            ),
             const Divider(height: 24),
-            _campo(Icons.phone_outlined, 'Telefone', _usuario['telefone']),
+            _campo(
+              Icons.phone_outlined,
+              'Telefone',
+              _usuario['telefone'],
+            ),
             const Divider(height: 24),
             _campo(
               Icons.calendar_today_outlined,
@@ -192,7 +226,11 @@ class _PerfilScreenState extends State<PerfilScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            _campo(Icons.agriculture_outlined, 'Nome', propriedade['nome']),
+            _campo(
+              Icons.agriculture_outlined,
+              'Nome',
+              propriedade['nome'],
+            ),
             const Divider(height: 24),
             _campo(
               Icons.location_on_outlined,
@@ -205,54 +243,64 @@ class _PerfilScreenState extends State<PerfilScreen> {
     );
   }
 
-  Widget _campo(IconData icone, String rotulo, Object? valor) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Icon(icone, size: 20, color: AppColors.textoSecundario),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              rotulo,
-              style: const TextStyle(color: AppColors.textoSecundario),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              valor?.toString().trim().isNotEmpty == true
-                  ? valor.toString()
-                  : 'Não informado',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: AppColors.texto,
-              ),
-            ),
-          ],
+  Widget _campo(IconData icone, String rotulo, Object? valor) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icone,
+          size: 20,
+          color: AppColors.textoSecundario,
         ),
-      ),
-    ],
-  );
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                rotulo,
+                style: const TextStyle(
+                  color: AppColors.textoSecundario,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                valor?.toString().trim().isNotEmpty == true
+                    ? valor.toString()
+                    : 'Não informado',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.texto,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
-  Widget _mensagemErro() => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      const Icon(
-        Icons.cloud_off_outlined,
-        size: 40,
-        color: AppColors.textoSecundario,
-      ),
-      const SizedBox(height: 12),
-      Text(
-        'Não foi possível carregar o perfil. $_erro',
-        textAlign: TextAlign.center,
-      ),
-      const SizedBox(height: 8),
-      OutlinedButton.icon(
-        onPressed: _carregarPerfil,
-        icon: const Icon(Icons.refresh),
-        label: const Text('Tentar novamente'),
-      ),
-    ],
-  );
+  Widget _mensagemErro() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(
+          Icons.cloud_off_outlined,
+          size: 40,
+          color: AppColors.textoSecundario,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Não foi possível carregar o perfil. $_erro',
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _carregarPerfil,
+          icon: const Icon(Icons.refresh),
+          label: const Text('Tentar novamente'),
+        ),
+      ],
+    );
+  }
 }
