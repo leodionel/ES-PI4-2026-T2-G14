@@ -10,6 +10,11 @@ public class SupervisoraDeConexao extends Thread {
     private final List<Parceiro> clientes;
     private final BackendClient backend;
 
+    // Um unico cliente HTTP para todas as conexoes
+    private static final BackendClient BACKEND = new BackendClient(
+        System.getenv().getOrDefault("BACKEND_URL", "http://localhost:8081")
+    );
+
     public SupervisoraDeConexao(
             Socket conexao,
             List<Parceiro> clientes) {
@@ -24,10 +29,7 @@ public class SupervisoraDeConexao extends Thread {
         this.clientes = clientes;
 
         // Cliente HTTP utilizado para consultar o Spring Boot
-        this.backend = 
-            new BackendClient(
-                System.getenv().getOrDefault("BACKEND_URL", "http://localhost:8081")
-            );
+        this.backend = BACKEND;
     }
 
     @Override
@@ -112,6 +114,18 @@ public class SupervisoraDeConexao extends Thread {
                 );
 
                 consultarDados(cliente, pedido);
+
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+
+                continue;
+            }
+
+            // PEDIDO 4 - Encaminhar uma rota da API (usado pelo aplicativo)
+            if (comunicado instanceof PedidoRequisicao pedido) {
+
+                encaminhar(cliente, pedido);
 
                 if (Thread.currentThread().isInterrupted()) {
                     return;
@@ -269,6 +283,68 @@ public class SupervisoraDeConexao extends Thread {
 
         System.out.println(
             "Resultado da consulta enviado ao cliente."
+        );
+    }
+
+    // Encaminha a requisicao ao Spring Boot e devolve a resposta como veio
+    private void encaminhar(
+            Parceiro cliente,
+            PedidoRequisicao pedido) throws IOException {
+
+        try {
+
+            BackendClient.Resposta resposta = backend.encaminhar(
+                pedido.getMetodo(),
+                pedido.getCaminho(),
+                pedido.getToken(),
+                pedido.getCorpo()
+            );
+
+            // Registra rota e codigo, sem token nem corpo
+            System.out.println(
+                pedido.getMetodo() + " " + pedido.getCaminho()
+                + " -> " + resposta.status()
+            );
+
+            cliente.enviar(
+                new RespostaRequisicao(
+                    resposta.status(),
+                    resposta.tipoConteudo(),
+                    resposta.corpo()
+                )
+            );
+
+        } catch (InterruptedException erro) {
+
+            Thread.currentThread().interrupt();
+            enviarErro(cliente, 503, "Requisicao interrompida.");
+
+        } catch (IOException erro) {
+
+            System.err.println(
+                "Falha ao encaminhar " + pedido.getMetodo() + " "
+                + pedido.getCaminho() + ": " + erro.getMessage()
+            );
+
+            enviarErro(cliente, 502, "Nao foi possivel acessar o backend.");
+        }
+    }
+
+    // Erro do proprio servidor, no mesmo formato JSON da API
+    private void enviarErro(
+            Parceiro cliente,
+            int status,
+            String mensagem) throws IOException {
+
+        String json = "{\"title\":\"Servidor indisponivel\",\"status\":"
+                + status + ",\"detail\":\"" + mensagem + "\"}";
+
+        cliente.enviar(
+            new RespostaRequisicao(
+                status,
+                "application/json",
+                json.getBytes(java.nio.charset.StandardCharsets.UTF_8)
+            )
         );
     }
 }

@@ -37,6 +37,11 @@ public interface AnaliseSoloRepository
             String usuarioId
         );
 
+        // Busca a analise mais recente de um talhao
+        Optional<AnaliseSolo> findFirstByTalhaoIdOrderByDataColetaDesc(
+            String talhaoId
+        );
+
         // Conta as analises de um talhao
         long countByTalhaoId(String talhaoId);
 
