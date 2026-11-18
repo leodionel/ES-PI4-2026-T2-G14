@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'talhoes_screen.dart';
-import 'simulacao_rotacao.dart';
+import 'simulacao_rotacao_dados.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
