@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'simulacao_rotacao_dados.dart';
+import 'perfil_screen.dart';
 
 class AnaliseSoloScreen extends StatefulWidget {
   final String talhaoNome;
@@ -698,7 +699,13 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
               MaterialPageRoute<void>(builder: (_) => const SimulacaoRotacao()),
             ),
           ),
-          _buildMenuItem(Icons.person, 'Perfil'),
+          _buildMenuItem(
+            Icons.person,
+            'Perfil',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const PerfilScreen()),
+            ),
+          ),
           const Spacer(),
           Container(
             padding: const EdgeInsets.all(16),

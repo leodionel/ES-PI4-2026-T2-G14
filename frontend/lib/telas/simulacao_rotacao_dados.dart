@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../data/services/api_client.dart';
 import '../data/services/token_storage.dart';
+import 'perfil_screen.dart';
 
 class SimulacaoRotacao extends StatefulWidget {
   const SimulacaoRotacao({super.key, this.onNavigate});
@@ -179,25 +180,36 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
           'Simulação de Rotação',
           selecionado: true,
         ),
-        _itemMenu(Icons.person_outline, 'Perfil'),
+        _itemMenu(
+          Icons.person_outline,
+          'Perfil',
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute<void>(builder: (_) => const PerfilScreen())),
+        ),
       ],
     ),
   );
 
-  Widget _itemMenu(IconData icone, String texto, {bool selecionado = false}) =>
-      ListTile(
-        dense: true,
-        selected: selecionado,
-        leading: Icon(icone, size: 18),
-        title: Text(texto, style: const TextStyle(fontSize: 12)),
-        onTap: () {
-          if (selecionado) {
-            _scaffoldKey.currentState?.closeDrawer();
-          } else {
-            widget.onNavigate?.call(texto);
-          }
-        },
-      );
+  Widget _itemMenu(
+    IconData icone,
+    String texto, {
+    bool selecionado = false,
+    VoidCallback? onTap,
+  }) => ListTile(
+    dense: true,
+    selected: selecionado,
+    leading: Icon(icone, size: 18),
+    title: Text(texto, style: const TextStyle(fontSize: 12)),
+    onTap: () {
+      _scaffoldKey.currentState?.closeDrawer();
+      if (onTap != null) {
+        onTap();
+      } else if (!selecionado) {
+        widget.onNavigate?.call(texto);
+      }
+    },
+  );
 
   Widget _conteudo() => LayoutBuilder(
     builder: (context, constraints) => SingleChildScrollView(

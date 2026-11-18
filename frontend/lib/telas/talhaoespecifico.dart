@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'simulacao_rotacao.dart';
+import 'perfil_screen.dart';
 
 class LinhaTempoScreen extends StatelessWidget {
   LinhaTempoScreen({super.key});
@@ -164,7 +165,13 @@ class LinhaTempoScreen extends StatelessWidget {
               MaterialPageRoute<void>(builder: (_) => const SimulacaoRotacao()),
             ),
           ),
-          _buildMenuItem(Icons.person, 'Perfil'),
+          _buildMenuItem(
+            Icons.person,
+            'Perfil',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const PerfilScreen()),
+            ),
+          ),
           const Spacer(),
           Container(
             padding: const EdgeInsets.all(16),
