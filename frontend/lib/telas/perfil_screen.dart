@@ -1,3 +1,6 @@
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
@@ -12,8 +15,9 @@ class PerfilScreen extends StatefulWidget {
 }
 
 class _PerfilScreenState extends State<PerfilScreen> {
-  final _api = ApiClient();
-  final _tokenStorage = TokenStorage();
+  final ApiClient _api = ApiClient();
+  final TokenStorage _tokenStorage = TokenStorage();
+
   Map<String, dynamic>? _perfil;
   String? _erro;
   bool _carregando = true;
@@ -21,7 +25,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
   @override
   void initState() {
     super.initState();
-    _carregarPerfil();
+    unawaited(_carregarPerfil());
   }
 
   Future<void> _carregarPerfil() async {
@@ -29,30 +33,74 @@ class _PerfilScreenState extends State<PerfilScreen> {
       _carregando = true;
       _erro = null;
     });
+
     try {
       final token = await _tokenStorage.lerToken();
+
       if (token == null || token.isEmpty) {
         throw Exception('Sessão expirada. Faça login novamente.');
       }
-      final perfil = await _api.get('/api/usuarios/me', token: token);
-      if (perfil is! Map) {
-        throw const FormatException('O servidor retornou um perfil inválido.');
+
+      final resposta = await _api.get(
+        '/api/usuarios/me',
+        token: token,
+      );
+
+      if (resposta is! Map) {
+        throw const FormatException(
+          'A API não retornou os dados do perfil.',
+        );
       }
-      if (mounted) setState(() => _perfil = Map<String, dynamic>.from(perfil));
+
+      if (mounted) {
+        setState(() {
+          _perfil = Map<String, dynamic>.from(resposta);
+        });
+      }
     } catch (erro) {
-      if (mounted) setState(() => _erro = erro.toString());
+      if (mounted) {
+        setState(() {
+          _erro = erro.toString().replaceFirst('Exception: ', '');
+        });
+      }
     } finally {
-      if (mounted) setState(() => _carregando = false);
+      if (mounted) {
+        setState(() {
+          _carregando = false;
+        });
+      }
     }
+  }
+
+  // Compatibilidade com respostas aninhadas ou planas da API.
+  Map<String, dynamic> get _usuario {
+    final usuario = _perfil?['usuario'];
+
+    if (usuario is Map) {
+      return Map<String, dynamic>.from(usuario);
+    }
+
+    return _perfil ?? <String, dynamic>{};
+  }
+
+  Map<String, dynamic>? get _propriedade {
+    final propriedade = _perfil?['propriedade'];
+
+    if (propriedade is Map) {
+      return Map<String, dynamic>.from(propriedade);
+    }
+
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final nome = _perfil?['nome']?.toString() ?? '';
+    final nome = (_usuario['nome']?.toString() ?? '').trim();
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F5EE),
+      backgroundColor: AppColors.fundo,
       appBar: AppBar(
-        title: const Text('Meu perfil'),
+        title: const Text('Perfil'),
         backgroundColor: AppColors.painel,
         foregroundColor: AppColors.verdeEscuro,
       ),
@@ -64,8 +112,19 @@ class _PerfilScreenState extends State<PerfilScreen> {
             child: _carregando
                 ? const Center(child: CircularProgressIndicator())
                 : _erro != null
-                ? _mensagemErro()
-                : _cartaoPerfil(nome),
+                    ? _mensagemErro()
+                    : ListView(
+                        children: [
+                          _cartaoPerfil(nome),
+                          const SizedBox(height: 16),
+                          if (_propriedade != null)
+                            _cartaoPropriedade(_propriedade!)
+                          else
+                            const Text(
+                              'Nenhuma propriedade cadastrada.',
+                            ),
+                        ],
+                      ),
           ),
         ),
       ),
@@ -73,13 +132,18 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 
   Widget _cartaoPerfil(String nome) {
-    final criadoEm = DateTime.tryParse(_perfil?['criadoEm']?.toString() ?? '');
+    final criadoEm = DateTime.tryParse(
+      _usuario['criadoEm']?.toString() ?? '',
+    );
+
     final dataFormatada = criadoEm == null
         ? '—'
         : '${criadoEm.day.toString().padLeft(2, '0')}/'
-              '${criadoEm.month.toString().padLeft(2, '0')}/${criadoEm.year}';
+            '${criadoEm.month.toString().padLeft(2, '0')}/'
+            '${criadoEm.year}';
+
     return Card(
-      color: Colors.white,
+      color: AppColors.painel,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -96,7 +160,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
                 radius: 36,
                 backgroundColor: const Color(0xFFE2EEE4),
                 child: Text(
-                  nome.isEmpty ? '?' : nome.trim()[0].toUpperCase(),
+                  nome.isEmpty ? '?' : nome[0].toUpperCase(),
                   style: const TextStyle(
                     fontSize: 28,
                     color: AppColors.verdeEscuro,
@@ -107,7 +171,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
             const SizedBox(height: 16),
             Center(
               child: Text(
-                nome,
+                nome.isEmpty ? 'Meu perfil' : nome,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 22,
@@ -117,9 +181,17 @@ class _PerfilScreenState extends State<PerfilScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            _campo(Icons.email_outlined, 'E-mail', _perfil?['email']),
+            _campo(
+              Icons.email_outlined,
+              'E-mail',
+              _usuario['email'],
+            ),
             const Divider(height: 24),
-            _campo(Icons.phone_outlined, 'Telefone', _perfil?['telefone']),
+            _campo(
+              Icons.phone_outlined,
+              'Telefone',
+              _usuario['telefone'],
+            ),
             const Divider(height: 24),
             _campo(
               Icons.calendar_today_outlined,
@@ -132,54 +204,103 @@ class _PerfilScreenState extends State<PerfilScreen> {
     );
   }
 
-  Widget _campo(IconData icone, String rotulo, Object? valor) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Icon(icone, size: 20, color: AppColors.textoSecundario),
-      const SizedBox(width: 12),
-      Expanded(
+  Widget _cartaoPropriedade(Map<String, dynamic> propriedade) {
+    return Card(
+      color: AppColors.painel,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.borda),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              rotulo,
-              style: const TextStyle(color: AppColors.textoSecundario),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              valor?.toString().trim().isNotEmpty == true
-                  ? valor.toString()
-                  : 'Não informado',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: AppColors.texto,
+            const Text(
+              'Propriedade',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.verdeEscuro,
               ),
+            ),
+            const SizedBox(height: 16),
+            _campo(
+              Icons.agriculture_outlined,
+              'Nome',
+              propriedade['nome'],
+            ),
+            const Divider(height: 24),
+            _campo(
+              Icons.location_on_outlined,
+              'Localização',
+              propriedade['localizacao'],
             ),
           ],
         ),
       ),
-    ],
-  );
+    );
+  }
 
-  Widget _mensagemErro() => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      const Icon(
-        Icons.cloud_off_outlined,
-        size: 40,
-        color: AppColors.textoSecundario,
-      ),
-      const SizedBox(height: 12),
-      Text(
-        'Não foi possível carregar o perfil. $_erro',
-        textAlign: TextAlign.center,
-      ),
-      const SizedBox(height: 8),
-      OutlinedButton.icon(
-        onPressed: _carregarPerfil,
-        icon: const Icon(Icons.refresh),
-        label: const Text('Tentar novamente'),
-      ),
-    ],
-  );
+  Widget _campo(IconData icone, String rotulo, Object? valor) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icone,
+          size: 20,
+          color: AppColors.textoSecundario,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                rotulo,
+                style: const TextStyle(
+                  color: AppColors.textoSecundario,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                valor?.toString().trim().isNotEmpty == true
+                    ? valor.toString()
+                    : 'Não informado',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.texto,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _mensagemErro() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(
+          Icons.cloud_off_outlined,
+          size: 40,
+          color: AppColors.textoSecundario,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Não foi possível carregar o perfil. $_erro',
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _carregarPerfil,
+          icon: const Icon(Icons.refresh),
+          label: const Text('Tentar novamente'),
+        ),
+      ],
+    );
+  }
 }

@@ -1,7 +1,8 @@
+
 import 'package:flutter/material.dart';
 import 'talhoes_screen.dart';
-import 'simulacao_rotacao_dados.dart';
 import 'perfil_screen.dart';
+import 'simulacao_rotacao.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -375,7 +376,14 @@ class DashboardScreen extends StatelessWidget {
           const SizedBox(height: 16),
 
           // DASHBOARD
-          _buildMenuItem(Icons.dashboard, 'Dashboard', isActive: true),
+          _buildMenuItem(
+            Icons.dashboard,
+            'Dashboard',
+            isActive: true,
+            onTap: () {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            },
+          ),
 
           // TALHÕES
           _buildMenuItem(
@@ -396,15 +404,17 @@ class DashboardScreen extends StatelessWidget {
           ),
 
           // PERFIL
-          _buildMenuItem(
-            Icons.person,
-            'Perfil',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const PerfilScreen()),
-              );
-            },
-          ),
+         _buildMenuItem(
+  Icons.person,
+  'Perfil',
+  onTap: () {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const PerfilScreen(),
+      ),
+    );
+  },
+),
 
           const Spacer(),
 
