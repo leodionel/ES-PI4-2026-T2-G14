@@ -315,7 +315,7 @@ class _CulturasSafrasScreenState extends State<CulturasSafrasScreen> {
                                 ),
                                 const SizedBox(height: 8),
                                 DropdownButtonFormField<String>(
-                                  value: _culturaSelecionada,
+                                  initialValue: _culturaSelecionada,
                                   decoration: InputDecoration(
                                     hintText: 'Selecione uma cultura',
                                     filled: true,
@@ -576,8 +576,9 @@ class _CulturasSafrasScreenState extends State<CulturasSafrasScreen> {
                                                     vertical: 4,
                                                   ),
                                               decoration: BoxDecoration(
-                                                color: corVerdeClaro
-                                                    .withOpacity(0.25),
+                                                color: corVerdeClaro.withValues(
+                                                  alpha: 0.25,
+                                                ),
                                                 borderRadius:
                                                     BorderRadius.circular(12),
                                               ),

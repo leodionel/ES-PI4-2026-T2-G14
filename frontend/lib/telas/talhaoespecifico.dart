@@ -3,7 +3,7 @@ import 'simulacao_rotacao.dart';
 import 'perfil_screen.dart';
 
 class LinhaTempoScreen extends StatelessWidget {
-  LinhaTempoScreen({super.key});
+  const LinhaTempoScreen({super.key});
 
   // Paleta de cores baseada no design
   final Color corFundo = const Color(0xFFF7F5EE);
