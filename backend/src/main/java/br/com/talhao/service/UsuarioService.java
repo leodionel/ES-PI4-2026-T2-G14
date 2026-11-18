@@ -123,4 +123,21 @@ public class UsuarioService {
                 usuario.criadoEm()
         );
     }
+
+    // Retorna os dados do perfil do usuario autenticado, sem expor o hash da senha.
+    public UsuarioResponse buscarPorId(String usuarioId) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Usuario nao encontrado"
+                ));
+
+        return new UsuarioResponse(
+                usuario.id(),
+                usuario.nome(),
+                usuario.email(),
+                usuario.telefone(),
+                usuario.criadoEm()
+        );
+    }
 }
