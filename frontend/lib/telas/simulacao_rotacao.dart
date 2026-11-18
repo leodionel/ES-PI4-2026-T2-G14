@@ -131,7 +131,7 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
 
         return Scaffold(
           key: _scaffoldKey,
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.fundo,
           appBar: desktop
               ? null
               : AppBar(
@@ -153,7 +153,7 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
                 if (desktop) _menuLateral(),
                 Expanded(
                   child: Container(
-                    color: Colors.white,
+                    color: AppColors.fundo,
                     child: _conteudo(),
                   ),
                 ),
@@ -167,29 +167,29 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
 
   Widget _menuLateral() {
     return Container(
-      width: 146,
+      width: 250,
       decoration: const BoxDecoration(
         color: AppColors.painel,
         border: Border(right: BorderSide(color: AppColors.borda)),
       ),
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const _Marca(),
-          const SizedBox(height: 22),
+          const SizedBox(height: 40),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 4),
             child: Text(
               'GESTÃO DA FAZENDA',
               style: TextStyle(
-                fontSize: 8,
-                letterSpacing: 0.2,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
                 color: AppColors.textoSecundario,
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 16),
           _itemMenu(Icons.grid_view_outlined, 'Dashboard'),
           _itemMenu(Icons.layers_outlined, 'Talhões'),
           _itemMenu(
@@ -211,8 +211,8 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
                 Text(
                   'Área monitorada',
                   style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
                     color: AppColors.texto,
                   ),
                 ),
@@ -220,14 +220,14 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
                 Text(
                   '128,4 ha',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 20,
                     color: AppColors.verdeEscuro,
                   ),
                 ),
                 Text(
                   '6 talhões cadastrados\n• 3 alertas ativos',
                   style: TextStyle(
-                    fontSize: 7,
+                    fontSize: 10,
                     height: 1.3,
                     color: AppColors.textoSecundario,
                   ),
@@ -242,9 +242,9 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
 
   Widget _itemMenu(IconData icone, String texto, {bool selecionado = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1),
+      margin: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: selecionado ? const Color(0xFFE2EEE4) : Colors.transparent,
+        color: selecionado ? Colors.white : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
@@ -256,24 +256,24 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
             }
           },
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 7),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
                 Icon(
                   icone,
-                  size: 12,
+                  size: 20,
                   color: selecionado
                       ? AppColors.verdeEscuro
                       : AppColors.textoSecundario,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     texto,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 8,
+                      fontSize: 14,
                       fontWeight:
                           selecionado ? FontWeight.w600 : FontWeight.normal,
                       color: selecionado
@@ -295,8 +295,8 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
       builder: (context, constraints) {
         return SingleChildScrollView(
           padding: EdgeInsets.symmetric(
-            horizontal: constraints.maxWidth < 500 ? 16 : 20,
-            vertical: 20,
+            horizontal: constraints.maxWidth < 500 ? 16 : 32,
+            vertical: 32,
           ),
           child: Center(
             child: ConstrainedBox(
@@ -308,7 +308,7 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
                     'Simulação de Rotação',
                     style: TextStyle(
                       fontFamily: 'Fraunces',
-                      fontSize: constraints.maxWidth < 500 ? 25 : 28,
+                      fontSize: constraints.maxWidth < 500 ? 28 : 32,
                       fontWeight: FontWeight.w700,
                       height: 1.1,
                       color: AppColors.verdeEscuro,
@@ -318,7 +318,7 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
                   const Text(
                     'Compare cenários de próxima cultura com base no histórico do talhão',
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 16,
                       color: AppColors.textoSecundario,
                     ),
                   ),
@@ -352,8 +352,8 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
     return Row(
       children: [
         Container(
-          width: 16,
-          height: 16,
+          width: 24,
+          height: 24,
           alignment: Alignment.center,
           decoration: const BoxDecoration(
             color: AppColors.verdeEscuro,
@@ -362,7 +362,7 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
           child: Text(
             '$numero',
             style: const TextStyle(
-              fontSize: 10,
+              fontSize: 14,
               fontWeight: FontWeight.w700,
               color: Colors.white,
             ),
@@ -372,7 +372,7 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
         Text(
           texto,
           style: const TextStyle(
-            fontSize: 10,
+            fontSize: 16,
             fontWeight: FontWeight.w500,
             color: AppColors.verdeEscuro,
           ),
@@ -394,8 +394,8 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
           onTap: () => setState(() => _talhaoSelecionado = index),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            width: 96,
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+            width: 150,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: selecionado ? const Color(0xFFF1EBDD) : Colors.white,
               border: Border.all(
@@ -409,7 +409,7 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
                 Text(
                   talhao.nome,
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppColors.texto,
                   ),
@@ -417,7 +417,7 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
                 Text(
                   '${talhao.area} • ${talhao.culturaAtual}',
                   style: const TextStyle(
-                    fontSize: 9,
+                    fontSize: 12,
                     color: AppColors.textoSecundario,
                   ),
                 ),
@@ -444,28 +444,28 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
         border: Border.all(color: AppColors.borda),
         borderRadius: BorderRadius.circular(12),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Wrap(
         spacing: 28,
         runSpacing: 8,
         children: itens
             .map(
               (item) => SizedBox(
-                width: 92,
+                width: 130,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       item.$1,
                       style: const TextStyle(
-                        fontSize: 9,
+                        fontSize: 12,
                         color: AppColors.textoSecundario,
                       ),
                     ),
                     Text(
                       item.$2,
                       style: const TextStyle(
-                        fontSize: 10,
+                        fontSize: 14,
                         fontWeight: FontWeight.w500,
                         color: AppColors.texto,
                       ),
@@ -486,14 +486,14 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
       children: _culturas.map((cultura) {
         final selecionada = _culturasSelecionadas.contains(cultura.nome);
         return SizedBox(
-          width: 76,
-          height: 28,
+          width: 112,
+          height: 40,
           child: ChoiceChip(
             label: Text(cultura.nome),
             selected: selecionada,
             onSelected: (valor) => _alternarCultura(cultura.nome, valor),
             labelStyle: TextStyle(
-              fontSize: 10,
+              fontSize: 14,
               color: AppColors.texto,
             ),
             backgroundColor: AppColors.painel.withValues(alpha: 0.7),
@@ -527,7 +527,7 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
         child: const Text(
           'Selecione pelo menos uma cultura para visualizar a comparação.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11, color: AppColors.textoSecundario),
+          style: TextStyle(fontSize: 16, color: AppColors.textoSecundario),
         ),
       );
     }
@@ -603,8 +603,8 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
                 Text(
                   cultura.descricao,
                   style: const TextStyle(
-                    fontSize: 9,
-                    height: 1.22,
+                    fontSize: 13,
+                    height: 1.4,
                     color: AppColors.verdeEscuro,
                   ),
                 ),
@@ -627,7 +627,7 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
                 child: const Text(
                   'Recomendado',
                   style: TextStyle(
-                    fontSize: 9,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
@@ -648,7 +648,7 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 9,
+              fontSize: 12,
               color: AppColors.textoSecundario,
             ),
           ),
@@ -691,7 +691,7 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
           const Text(
             'Como a recomendação é calculada',
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 16,
               fontWeight: FontWeight.w700,
               color: AppColors.verdeEscuro,
             ),
@@ -713,8 +713,8 @@ class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
                     child: Text(
                       criterio,
                       style: const TextStyle(
-                        fontSize: 9,
-                        height: 1.25,
+                        fontSize: 13,
+                        height: 1.4,
                         color: AppColors.texto,
                       ),
                     ),
@@ -737,8 +737,8 @@ class _Marca extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 22,
-          height: 22,
+        width: 36,
+        height: 36,
           decoration: BoxDecoration(
             color: AppColors.verdeEscuro,
             borderRadius: BorderRadius.circular(7),
@@ -746,7 +746,7 @@ class _Marca extends StatelessWidget {
           child: const Icon(
             Icons.agriculture_outlined,
             color: Colors.white,
-            size: 14,
+            size: 22,
           ),
         ),
         const SizedBox(width: 5),
@@ -755,7 +755,7 @@ class _Marca extends StatelessWidget {
             'Prontuário Digital\ndo Talhão',
             style: TextStyle(
               fontFamily: 'Fraunces',
-              fontSize: 9,
+              fontSize: 16,
               height: 1.1,
               fontWeight: FontWeight.w700,
               color: AppColors.verdeEscuro,
