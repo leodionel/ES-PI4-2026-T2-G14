@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'talhoes_screen.dart';
+import 'simulacao_rotacao.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -28,14 +29,19 @@ class DashboardScreen extends StatelessWidget {
     ).showSnackBar(SnackBar(content: Text('$tela ainda não está integrada.')));
   }
 
+  void _abrirSimulacao(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(builder: (_) => const SimulacaoRotacao()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final largura = MediaQuery.sizeOf(context).width;
     return Scaffold(
       backgroundColor: corFundo,
-      drawer: largura < 700
-          ? Drawer(child: _buildSidebar(context))
-          : null,
+      drawer: largura < 700 ? Drawer(child: _buildSidebar(context)) : null,
       appBar: largura < 700
           ? AppBar(
               title: const Text('Prontuário Digital do Talhão'),
@@ -315,7 +321,7 @@ class DashboardScreen extends StatelessWidget {
 
                         ElevatedButton(
                           onPressed: () {
-                            _mostrarAviso(context, 'Simulação de Rotação');
+                            _abrirSimulacao(context);
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
@@ -391,7 +397,7 @@ class DashboardScreen extends StatelessWidget {
             Icons.autorenew,
             'Simulação de Rotação',
             onTap: () {
-              _mostrarAviso(context, 'Simulação de Rotação');
+              _abrirSimulacao(context);
             },
           ),
 
@@ -590,4 +596,3 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 }
-

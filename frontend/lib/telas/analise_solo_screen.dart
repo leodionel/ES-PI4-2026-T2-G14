@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'simulacao_rotacao.dart';
 
 class AnaliseSoloScreen extends StatefulWidget {
   final String talhaoNome;
@@ -690,7 +691,13 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
           const SizedBox(height: 16),
           _buildMenuItem(Icons.dashboard, 'Dashboard'),
           _buildMenuItem(Icons.layers, 'Talhões', isActive: true),
-          _buildMenuItem(Icons.autorenew, 'Simulação de Rotação'),
+          _buildMenuItem(
+            Icons.autorenew,
+            'Simulação de Rotação',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const SimulacaoRotacao()),
+            ),
+          ),
           _buildMenuItem(Icons.person, 'Perfil'),
           const Spacer(),
           Container(
@@ -722,7 +729,12 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String title, {bool isActive = false}) {
+  Widget _buildMenuItem(
+    IconData icon,
+    String title, {
+    bool isActive = false,
+    VoidCallback? onTap,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -738,7 +750,7 @@ class _AnaliseSoloScreenState extends State<AnaliseSoloScreen> {
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
           ),
         ),
-        onTap: () {},
+        onTap: onTap,
       ),
     );
   }
