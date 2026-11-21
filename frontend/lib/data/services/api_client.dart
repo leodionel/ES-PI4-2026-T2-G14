@@ -107,6 +107,26 @@ class ApiClient {
     }
   }
 
+  // Lê a mensagem de erro enviada pelo servidor (campo "detail" do
+  // ProblemDetail). Se não houver, usa o texto padrão.
+  String _mensagemDoServidor(RespostaServidor resposta, String padrao) {
+    try {
+      final json = jsonDecode(utf8.decode(resposta.corpo));
+
+      if (json is Map) {
+        final detalhe = json['detail'] ?? json['mensagem'] ?? json['message'];
+
+        if (detalhe is String && detalhe.trim().isNotEmpty) {
+          return detalhe.trim();
+        }
+      }
+    } catch (_) {
+      // Corpo vazio ou fora do formato esperado.
+    }
+
+    return padrao;
+  }
+
   // Analisa o status HTTP e o JSON recebido.
   dynamic _processarResposta(RespostaServidor resposta) {
     final codigo = resposta.status;
@@ -119,16 +139,22 @@ class ApiClient {
     }
 
     if (codigo == 400 || codigo == 422) {
-      throw const AppException(
+      throw AppException(
         tipo: TipoErro.validacao,
-        mensagem: 'Os dados informados são inválidos.',
+        mensagem: _mensagemDoServidor(
+          resposta,
+          'Os dados informados são inválidos.',
+        ),
       );
     }
 
     if (codigo == 409) {
-      throw const AppException(
+      throw AppException(
         tipo: TipoErro.validacao,
-        mensagem: 'Já existe um registro com esses dados.',
+        mensagem: _mensagemDoServidor(
+          resposta,
+          'Já existe um registro com esses dados.',
+        ),
       );
     }
 
