@@ -25,6 +25,20 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 new JwtAuthInterceptor(jwtDecoder)
         ).addPathPatterns(
 
+                // Perfil do usuario logado (cadastro e login ficam abertos)
+                "/api/usuarios/me",
+
+                // Rotas de talhoes e plantios
+                "/api/talhoes",
+                "/api/talhoes/**",
+
+                // Perfil do usuario autenticado
+                "/api/usuarios/me",
+
+                // Rotas do catalogo de culturas
+                "/api/culturas",
+                "/api/culturas/**",
+
                 // Rotas de propriedades
                 "/api/propriedades",
                 "/api/propriedades/**",

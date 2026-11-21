@@ -9,6 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import br.com.talhao.model.Propriedade;
 import br.com.talhao.repository.PropriedadeRepository;
+import br.com.talhao.repository.TalhaoRepository;
 import br.com.talhao.repository.UsuarioRepository;
 
 // Responsavel pelas regras de negocio das propriedades rurais
@@ -17,14 +18,17 @@ public class PropriedadeService {
 
     private final PropriedadeRepository propriedadeRepository;
     private final UsuarioRepository usuarioRepository;
+    private final TalhaoRepository talhaoRepository;
 
     // Injecao de dependencias pelo Spring Boot
     public PropriedadeService(
             PropriedadeRepository propriedadeRepository,
-            UsuarioRepository usuarioRepository) {
+            UsuarioRepository usuarioRepository,
+            TalhaoRepository talhaoRepository) {
 
         this.propriedadeRepository = propriedadeRepository;
         this.usuarioRepository = usuarioRepository;
+        this.talhaoRepository = talhaoRepository;
     }
 
     // CADASTRAR UMA PROPRIEDADE
@@ -38,6 +42,14 @@ public class PropriedadeService {
         String nomeValidado = validarTexto(nome, "Nome");
         String localizacaoValidada =
                 validarTexto(localizacao, "Localizacao");
+
+        // RN11: no MVP cada usuario tem uma unica propriedade
+        if (!propriedadeRepository.findByUsuarioId(usuarioId).isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "O usuario ja possui uma propriedade cadastrada"
+            );
+        }
 
         // O MongoDB gera o ID da nova propriedade
         Propriedade propriedade = new Propriedade(
@@ -105,6 +117,14 @@ public class PropriedadeService {
 
         // Busca a propriedade associada ao usuario informado
         Propriedade propriedade = buscarPorId(id, usuarioId);
+
+        // Nao exclui enquanto houver talhoes (e historico) vinculados
+        if (talhaoRepository.existsByPropriedadeId(propriedade.id())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Exclua os talhoes da propriedade antes de exclui-la"
+            );
+        }
 
         propriedadeRepository.delete(propriedade);
     }
