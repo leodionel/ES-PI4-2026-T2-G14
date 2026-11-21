@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 import br.com.talhao.dto.ExclusaoTalhaoRequest;
 import br.com.talhao.dto.TalhaoRequest;
 import br.com.talhao.dto.TalhaoResponse;
+import br.com.talhao.dto.TalhaoResumoResponse;
+import br.com.talhao.service.TalhaoResumoService;
 import br.com.talhao.service.TalhaoService;
 
 import jakarta.validation.Valid;
@@ -28,10 +30,15 @@ import jakarta.validation.Valid;
 public class TalhaoController {
 
     private final TalhaoService talhaoService;
+    private final TalhaoResumoService talhaoResumoService;
 
-    // Recebe o Service pelo construtor
-    public TalhaoController(TalhaoService talhaoService) {
+    // Recebe os Services pelo construtor
+    public TalhaoController(
+            TalhaoService talhaoService,
+            TalhaoResumoService talhaoResumoService) {
+
         this.talhaoService = talhaoService;
+        this.talhaoResumoService = talhaoResumoService;
     }
 
     // Cadastra um talhao
@@ -45,12 +52,12 @@ public class TalhaoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(talhao);
     }
 
-    // Lista os talhoes do usuario autenticado
+    // Lista os talhoes do usuario autenticado, com cultura atual e status
     @GetMapping
-    public ResponseEntity<List<TalhaoResponse>> listar(
+    public ResponseEntity<List<TalhaoResumoResponse>> listar(
             @RequestAttribute("usuarioIdAutenticado") String usuarioId) {
 
-        return ResponseEntity.ok(talhaoService.listar(usuarioId));
+        return ResponseEntity.ok(talhaoResumoService.listar(usuarioId));
     }
 
     // Detalha um talhao, com a quantidade de safras e analises

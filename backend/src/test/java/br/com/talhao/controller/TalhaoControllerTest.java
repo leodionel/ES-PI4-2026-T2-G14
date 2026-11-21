@@ -1,6 +1,7 @@
 package br.com.talhao.controller;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -16,6 +17,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
+import br.com.talhao.dto.CulturaAtualResponse;
+import br.com.talhao.dto.TalhaoResumoResponse;
+import br.com.talhao.model.StatusSolo;
+import br.com.talhao.service.TalhaoResumoService;
 import br.com.talhao.service.TalhaoService;
 
 import static org.mockito.Mockito.doThrow;
@@ -33,6 +38,9 @@ class TalhaoControllerTest {
 
     @MockitoBean
     private TalhaoService talhaoService;
+
+    @MockitoBean
+    private TalhaoResumoService talhaoResumoService;
 
     // Simula a validacao do JWT feita pelo interceptor
     @MockitoBean
@@ -70,12 +78,48 @@ class TalhaoControllerTest {
     void deveListarTalhoesComToken() throws Exception {
 
         autenticarComoUsuario1();
-        when(talhaoService.listar("u1")).thenReturn(List.of());
+        when(talhaoResumoService.listar("u1")).thenReturn(List.of());
 
         mockMvc.perform(get("/api/talhoes")
                 .header("Authorization", AUTHORIZATION))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
+    }
+
+    // TESTE 2B - A lista traz a cultura atual e o status do solo
+    @Test
+    void deveListarComCulturaAtualEStatus() throws Exception {
+
+        autenticarComoUsuario1();
+        when(talhaoResumoService.listar("u1")).thenReturn(List.of(
+                new TalhaoResumoResponse(
+                        "t1", "Talhao Norte", 12.5,
+                        Instant.parse("2026-01-01T12:00:00Z"), 2, 3,
+                        new CulturaAtualResponse(
+                                "pl1", "soja", "Soja",
+                                LocalDate.of(2026, 3, 1)),
+                        StatusSolo.ATENCAO),
+                new TalhaoResumoResponse(
+                        "t2", "Talhao Novo", 4.0,
+                        Instant.parse("2026-01-02T12:00:00Z"), 0, 0,
+                        null,
+                        StatusSolo.SEM_ANALISE)));
+
+        mockMvc.perform(get("/api/talhoes")
+                .header("Authorization", AUTHORIZATION))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value("t1"))
+                .andExpect(jsonPath("$[0].totalPlantios").value(2))
+                .andExpect(jsonPath("$[0].totalAnalises").value(3))
+                .andExpect(jsonPath("$[0].culturaAtual.plantioId")
+                        .value("pl1"))
+                .andExpect(jsonPath("$[0].culturaAtual.nome").value("Soja"))
+                .andExpect(jsonPath("$[0].culturaAtual.dataPlantio")
+                        .value("2026-03-01"))
+                .andExpect(jsonPath("$[0].statusSolo").value("ATENCAO"))
+                .andExpect(jsonPath("$[1].culturaAtual").doesNotExist())
+                .andExpect(jsonPath("$[1].statusSolo").value("SEM_ANALISE"));
     }
 
     // TESTE 3 - Area negativa e rejeitada pela validacao
