@@ -1,12 +1,14 @@
-
-import 'dart:async';
-
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../core/app_exception.dart';
+import '../core/app_textos.dart';
 import '../core/theme/app_colors.dart';
-import '../data/services/api_client.dart';
-import '../data/services/token_storage.dart';
+import '../core/widgets/app_button.dart';
+import '../data/repositories/perfil_repository.dart';
 
+// Perfil do produtor e dados da propriedade (RF05). O e-mail é o login e não
+// pode ser alterado. Para sair do app, use o menu.
 class PerfilScreen extends StatefulWidget {
   const PerfilScreen({super.key});
 
@@ -15,290 +17,446 @@ class PerfilScreen extends StatefulWidget {
 }
 
 class _PerfilScreenState extends State<PerfilScreen> {
-  final ApiClient _api = ApiClient();
-  final TokenStorage _tokenStorage = TokenStorage();
-
-  Map<String, dynamic>? _perfil;
-  String? _erro;
   bool _carregando = true;
+  bool _ocupado = false;
+  String? _erro;
+  PerfilCompleto? _perfil;
+
+  PerfilRepository get _repo => context.read<PerfilRepository>();
 
   @override
   void initState() {
     super.initState();
-    unawaited(_carregarPerfil());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _carregar());
   }
 
-  Future<void> _carregarPerfil() async {
+  String _mensagem(Object e) =>
+      e is AppException ? e.mensagem : AppTextos.erroInesperado;
+
+  void _aviso(String texto) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(texto)));
+  }
+
+  Future<void> _carregar() async {
     setState(() {
       _carregando = true;
       _erro = null;
     });
 
     try {
-      final token = await _tokenStorage.lerToken();
+      final perfil = await _repo.buscar();
 
-      if (token == null || token.isEmpty) {
-        throw Exception('Sessão expirada. Faça login novamente.');
-      }
-
-      final resposta = await _api.get(
-        '/api/usuarios/me',
-        token: token,
-      );
-
-      if (resposta is! Map) {
-        throw const FormatException(
-          'A API não retornou os dados do perfil.',
-        );
-      }
-
-      if (mounted) {
-        setState(() {
-          _perfil = Map<String, dynamic>.from(resposta);
-        });
-      }
-    } catch (erro) {
-      if (mounted) {
-        setState(() {
-          _erro = erro.toString().replaceFirst('Exception: ', '');
-        });
-      }
+      if (mounted) setState(() => _perfil = perfil);
+    } catch (e) {
+      if (mounted) setState(() => _erro = _mensagem(e));
     } finally {
-      if (mounted) {
-        setState(() {
-          _carregando = false;
-        });
-      }
+      if (mounted) setState(() => _carregando = false);
     }
   }
 
-  // Compatibilidade com respostas aninhadas ou planas da API.
-  Map<String, dynamic> get _usuario {
-    final usuario = _perfil?['usuario'];
+  Future<void> _salvar(Future<void> Function() acao, String sucesso) async {
+    if (_ocupado) return;
 
-    if (usuario is Map) {
-      return Map<String, dynamic>.from(usuario);
+    setState(() => _ocupado = true);
+
+    try {
+      await acao();
+
+      if (!mounted) return;
+
+      _aviso(sucesso);
+      await _carregar();
+    } catch (e) {
+      if (mounted) _aviso(_mensagem(e));
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
     }
-
-    return _perfil ?? <String, dynamic>{};
   }
 
-  Map<String, dynamic>? get _propriedade {
-    final propriedade = _perfil?['propriedade'];
+  Future<void> _editarUsuario() async {
+    final perfil = _perfil!;
 
-    if (propriedade is Map) {
-      return Map<String, dynamic>.from(propriedade);
-    }
+    final dados = await showDialog<({String nome, String telefone})>(
+      context: context,
+      builder: (_) =>
+          _FormularioUsuario(nome: perfil.nome, telefone: perfil.telefone),
+    );
 
-    return null;
+    if (dados == null) return;
+
+    await _salvar(
+      () => _repo.atualizarUsuario(dados.nome, dados.telefone),
+      'Dados atualizados.',
+    );
+  }
+
+  Future<void> _editarPropriedade() async {
+    final atual = _perfil!.propriedade;
+
+    final dados = await showDialog<({String nome, String localizacao})>(
+      context: context,
+      builder: (_) => _FormularioPropriedadePerfil(propriedade: atual),
+    );
+
+    if (dados == null) return;
+
+    await _salvar(
+      () => _repo.salvarPropriedade(
+        id: atual?.id,
+        nome: dados.nome,
+        localizacao: dados.localizacao,
+      ),
+      atual == null ? 'Propriedade cadastrada.' : 'Propriedade atualizada.',
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final nome = (_usuario['nome']?.toString() ?? '').trim();
+    if (_carregando && _perfil == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-    return Scaffold(
-      backgroundColor: AppColors.fundo,
-      appBar: AppBar(
-        title: const Text('Perfil'),
-        backgroundColor: AppColors.painel,
-        foregroundColor: AppColors.verdeEscuro,
-      ),
-      body: Center(
+    if (_perfil == null) {
+      return Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
+          constraints: const BoxConstraints(maxWidth: 420),
           child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: _carregando
-                ? const Center(child: CircularProgressIndicator())
-                : _erro != null
-                    ? _mensagemErro()
-                    : ListView(
-                        children: [
-                          _cartaoPerfil(nome),
-                          const SizedBox(height: 16),
-                          if (_propriedade != null)
-                            _cartaoPropriedade(_propriedade!)
-                          else
-                            const Text(
-                              'Nenhuma propriedade cadastrada.',
-                            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _erro ?? AppTextos.erroInesperado,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                AppButton(texto: 'Tentar novamente', onPressed: _carregar),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final perfil = _perfil!;
+    final propriedade = perfil.propriedade;
+
+    return RefreshIndicator(
+      onRefresh: _carregar,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _Secao(
+                  titulo: 'Dados pessoais',
+                  rotuloAcao: 'Editar',
+                  aoEditar: _ocupado ? null : _editarUsuario,
+                  linhas: [
+                    ('Nome', perfil.nome),
+                    ('E-mail', perfil.email),
+                    ('Telefone', _formatarTelefone(perfil.telefone)),
+                  ],
+                  rodape: 'O e-mail é o seu login e não pode ser alterado.',
+                ),
+                const SizedBox(height: 20),
+                _Secao(
+                  titulo: 'Propriedade',
+                  rotuloAcao: propriedade == null ? 'Cadastrar' : 'Editar',
+                  aoEditar: _ocupado ? null : _editarPropriedade,
+                  linhas: propriedade == null
+                      ? const []
+                      : [
+                          ('Nome', propriedade.nome),
+                          ('Localização', propriedade.localizacao),
                         ],
-                      ),
+                  vazio: 'Nenhuma propriedade cadastrada.',
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _cartaoPerfil(String nome) {
-    final criadoEm = DateTime.tryParse(
-      _usuario['criadoEm']?.toString() ?? '',
-    );
+  String _formatarTelefone(String digitos) {
+    if (digitos.length == 11) {
+      return '(${digitos.substring(0, 2)}) ${digitos.substring(2, 7)}-${digitos.substring(7)}';
+    }
+    if (digitos.length == 10) {
+      return '(${digitos.substring(0, 2)}) ${digitos.substring(2, 6)}-${digitos.substring(6)}';
+    }
+    return digitos;
+  }
+}
 
-    final dataFormatada = criadoEm == null
-        ? '—'
-        : '${criadoEm.day.toString().padLeft(2, '0')}/'
-            '${criadoEm.month.toString().padLeft(2, '0')}/'
-            '${criadoEm.year}';
+class _Secao extends StatelessWidget {
+  const _Secao({
+    required this.titulo,
+    required this.rotuloAcao,
+    required this.aoEditar,
+    required this.linhas,
+    this.rodape,
+    this.vazio,
+  });
+
+  final String titulo;
+  final String rotuloAcao;
+  final VoidCallback? aoEditar;
+  final List<(String, String)> linhas;
+  final String? rodape;
+  final String? vazio;
+
+  @override
+  Widget build(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
 
     return Card(
-      color: AppColors.painel,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.borda),
-      ),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: CircleAvatar(
-                radius: 36,
-                backgroundColor: const Color(0xFFE2EEE4),
-                child: Text(
-                  nome.isEmpty ? '?' : nome[0].toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 28,
-                    color: AppColors.verdeEscuro,
+            Row(
+              children: [
+                Expanded(child: Text(titulo, style: textos.titleLarge)),
+                TextButton(onPressed: aoEditar, child: Text(rotuloAcao)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (linhas.isEmpty && vazio != null)
+              Text(vazio!, style: textos.bodySmall),
+            for (final (rotulo, valor) in linhas)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      rotulo,
+                      style: textos.bodySmall?.copyWith(fontSize: 14),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(valor.isEmpty ? 'Não informado' : valor),
+                  ],
+                ),
+              ),
+            if (rodape != null)
+              Text(rodape!, style: textos.bodySmall?.copyWith(fontSize: 14)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Edição de nome e telefone (RF05). As regras são as mesmas do cadastro.
+class _FormularioUsuario extends StatefulWidget {
+  const _FormularioUsuario({required this.nome, required this.telefone});
+
+  final String nome;
+  final String telefone;
+
+  @override
+  State<_FormularioUsuario> createState() => _FormularioUsuarioState();
+}
+
+class _FormularioUsuarioState extends State<_FormularioUsuario> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nome;
+  late final TextEditingController _telefone;
+
+  @override
+  void initState() {
+    super.initState();
+    _nome = TextEditingController(text: widget.nome);
+    _telefone = TextEditingController(text: widget.telefone);
+  }
+
+  @override
+  void dispose() {
+    _nome.dispose();
+    _telefone.dispose();
+    super.dispose();
+  }
+
+  String _soDigitos(String texto) => texto.replaceAll(RegExp(r'\D'), '');
+
+  void _salvar() {
+    if (!_formKey.currentState!.validate()) return;
+
+    Navigator.of(
+      context,
+    ).pop((nome: _nome.text.trim(), telefone: _soDigitos(_telefone.text)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Editar dados pessoais'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _nome,
+                  autofocus: true,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(labelText: 'Nome completo'),
+                  validator: (valor) {
+                    final nome = (valor ?? '').trim();
+                    if (nome.length < 3 || nome.length > 120) {
+                      return 'O nome deve ter entre 3 e 120 caracteres.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _telefone,
+                  keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _salvar(),
+                  decoration: const InputDecoration(
+                    labelText: 'Telefone',
+                    hintText: '(11) 99999-9999',
                   ),
+                  validator: (valor) {
+                    final digitos = _soDigitos(valor ?? '');
+                    if (digitos.length != 10 && digitos.length != 11) {
+                      return 'Informe o telefone com DDD.';
+                    }
+                    return null;
+                  },
                 ),
-              ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Center(
-              child: Text(
-                nome.isEmpty ? 'Meu perfil' : nome,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.verdeEscuro,
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            _campo(
-              Icons.email_outlined,
-              'E-mail',
-              _usuario['email'],
-            ),
-            const Divider(height: 24),
-            _campo(
-              Icons.phone_outlined,
-              'Telefone',
-              _usuario['telefone'],
-            ),
-            const Divider(height: 24),
-            _campo(
-              Icons.calendar_today_outlined,
-              'Conta criada em',
-              dataFormatada,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _cartaoPropriedade(Map<String, dynamic> propriedade) {
-    return Card(
-      color: AppColors.painel,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.borda),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Propriedade',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.verdeEscuro,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _campo(
-              Icons.agriculture_outlined,
-              'Nome',
-              propriedade['nome'],
-            ),
-            const Divider(height: 24),
-            _campo(
-              Icons.location_on_outlined,
-              'Localização',
-              propriedade['localizacao'],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _campo(IconData icone, String rotulo, Object? valor) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(
-          icone,
-          size: 20,
-          color: AppColors.textoSecundario,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                rotulo,
-                style: const TextStyle(
-                  color: AppColors.textoSecundario,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                valor?.toString().trim().isNotEmpty == true
-                    ? valor.toString()
-                    : 'Não informado',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.texto,
-                ),
-              ),
-            ],
           ),
         ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(onPressed: _salvar, child: const Text('Salvar')),
       ],
     );
   }
+}
 
-  Widget _mensagemErro() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(
-          Icons.cloud_off_outlined,
-          size: 40,
-          color: AppColors.textoSecundario,
+// Cadastro ou edição da propriedade (nome e localização).
+class _FormularioPropriedadePerfil extends StatefulWidget {
+  const _FormularioPropriedadePerfil({this.propriedade});
+
+  final PropriedadePerfil? propriedade;
+
+  @override
+  State<_FormularioPropriedadePerfil> createState() =>
+      _FormularioPropriedadePerfilState();
+}
+
+class _FormularioPropriedadePerfilState
+    extends State<_FormularioPropriedadePerfil> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nome;
+  late final TextEditingController _localizacao;
+
+  @override
+  void initState() {
+    super.initState();
+    _nome = TextEditingController(text: widget.propriedade?.nome ?? '');
+    _localizacao = TextEditingController(
+      text: widget.propriedade?.localizacao ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _nome.dispose();
+    _localizacao.dispose();
+    super.dispose();
+  }
+
+  void _salvar() {
+    if (!_formKey.currentState!.validate()) return;
+
+    Navigator.of(
+      context,
+    ).pop((nome: _nome.text.trim(), localizacao: _localizacao.text.trim()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(
+        widget.propriedade == null
+            ? 'Cadastrar propriedade'
+            : 'Editar propriedade',
+      ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _nome,
+                  autofocus: true,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'Nome da propriedade',
+                  ),
+                  validator: (valor) {
+                    final nome = (valor ?? '').trim();
+                    if (nome.isEmpty) return 'Informe o nome da propriedade.';
+                    if (nome.length > 150) return 'Use no máximo 150 caracteres.';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _localizacao,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _salvar(),
+                  decoration: const InputDecoration(
+                    labelText: 'Localização',
+                    hintText: 'Cidade e estado',
+                  ),
+                  validator: (valor) {
+                    final texto = (valor ?? '').trim();
+                    if (texto.isEmpty) return 'Informe a localização.';
+                    if (texto.length > 255) return 'Use no máximo 255 caracteres.';
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 12),
-        Text(
-          'Não foi possível carregar o perfil. $_erro',
-          textAlign: TextAlign.center,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
         ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: _carregarPerfil,
-          icon: const Icon(Icons.refresh),
-          label: const Text('Tentar novamente'),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.verdeEscuro),
+          onPressed: _salvar,
+          child: const Text('Salvar'),
         ),
       ],
     );

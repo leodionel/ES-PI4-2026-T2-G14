@@ -16,7 +16,7 @@ class AppTextos {
   static const ocultarSenha = 'Ocultar senha';
 
   static const entrar = 'Entrar no Prontuário';
-  static const entrando = 'Entrnado...';
+  static const entrando = 'Entrando...';
   static const esqueciSenha = 'Esqueci minha senha';
   static const semConta = 'Não tem uma conta ainda?';
   static const criarConta = 'Criar conta grátis';

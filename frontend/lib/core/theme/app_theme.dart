@@ -40,6 +40,16 @@ class AppTheme {
         fontWeight: FontWeight.w600,
         color: AppColors.verdeEscuro,
       ),
+      titleMedium: TextStyle(
+        fontSize: 17,
+        fontWeight: FontWeight.w600,
+        color: AppColors.texto,
+      ),
+      labelLarge: TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        color: AppColors.texto,
+      ),
       bodyLarge: TextStyle(fontSize: 18, color: AppColors.texto),
       bodyMedium: TextStyle(fontSize: 16, color: AppColors.texto),
       bodySmall: TextStyle(fontSize: 16, color: AppColors.textoSecundario),
@@ -90,6 +100,75 @@ class AppTheme {
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
+    ),
+
+    // Barra superior das telas internas
+    appBarTheme: const AppBarTheme(
+      backgroundColor: AppColors.fundo,
+      foregroundColor: AppColors.verdeEscuro,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      centerTitle: false,
+      titleTextStyle: TextStyle(
+        fontFamily: 'Fraunces',
+        fontSize: 22,
+        fontWeight: FontWeight.w600,
+        color: AppColors.verdeEscuro,
+      ),
+    ),
+
+    // Cartões: fundo do painel, borda fina e sem sombra
+    cardTheme: CardThemeData(
+      color: AppColors.painel,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.borda),
+      ),
+    ),
+
+    dividerTheme: const DividerThemeData(
+      color: AppColors.borda,
+      thickness: 1,
+      space: 1,
+    ),
+
+    // Botão secundário
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.verdeEscuro,
+        side: const BorderSide(color: AppColors.verdeEscuro),
+        minimumSize: const Size(48, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        textStyle: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    ),
+
+    // Janelas de diálogo
+    dialogTheme: DialogThemeData(
+      backgroundColor: AppColors.fundo,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.borda),
+      ),
+    ),
+
+    // Avisos rápidos
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: AppColors.verdeEscuro,
+      contentTextStyle: const TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 15,
+        color: AppColors.fundo,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     ),
 
     // Botões de texto, como criar conta e recuperar senha

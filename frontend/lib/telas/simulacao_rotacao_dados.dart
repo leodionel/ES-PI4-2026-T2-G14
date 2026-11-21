@@ -1,508 +1,270 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../core/app_exception.dart';
+import '../core/app_textos.dart';
 import '../core/theme/app_colors.dart';
-import '../data/services/api_client.dart';
-import '../data/services/token_storage.dart';
-import 'perfil_screen.dart';
+import '../core/widgets/app_button.dart';
+import '../data/repositories/simulacao_repository.dart';
+import '../data/repositories/talhao_repository.dart';
+import '../domain/models/resultado_simulacao.dart';
+import '../domain/models/talhao_resumo.dart';
+import '../ui/simulacao/recomendacoes_view.dart';
 
+// Simulação de rotação (RF17 a RF21). Primeiro o produtor escolhe o talhão e
+// de 2 a 3 culturas; depois vê os cenários lado a lado com a justificativa.
 class SimulacaoRotacao extends StatefulWidget {
-  const SimulacaoRotacao({super.key, this.onNavigate});
-
-  final ValueChanged<String>? onNavigate;
+  const SimulacaoRotacao({super.key});
 
   @override
   State<SimulacaoRotacao> createState() => _SimulacaoRotacaoState();
 }
 
 class _SimulacaoRotacaoState extends State<SimulacaoRotacao> {
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
-  final _api = ApiClient();
-  final _tokenStorage = TokenStorage();
+  static const int _minimo = 2;
+  static const int _maximo = 3;
 
-  List<Map<String, dynamic>> _talhoes = [];
-  List<Map<String, dynamic>> _culturas = [];
-  final Set<String> _culturasSelecionadas = {};
-  String? _talhaoSelecionado;
-  Map<String, dynamic>? _resultado;
-  String? _erro;
   bool _carregando = true;
   bool _simulando = false;
+  bool _mostrandoResultado = false;
+  String? _erro;
+  String? _erroSimulacao;
+
+  List<TalhaoResumo> _talhoes = const [];
+  List<CulturaOpcao> _culturas = const [];
+  String? _talhaoId;
+  final Set<String> _selecionadas = <String>{};
+  ResultadoSimulacao? _resultado;
+
+  TalhaoResumo? get _talhao {
+    for (final t in _talhoes) {
+      if (t.id == _talhaoId) return t;
+    }
+    return null;
+  }
 
   @override
   void initState() {
     super.initState();
-    _carregarDados();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _carregar());
   }
 
-  Future<void> _carregarDados() async {
+  String _mensagem(Object e) =>
+      e is AppException ? e.mensagem : AppTextos.erroInesperado;
+
+  Future<void> _carregar() async {
+    final talhoes = context.read<TalhaoRepository>();
+    final simulacao = context.read<SimulacaoRepository>();
+
     setState(() {
       _carregando = true;
       _erro = null;
     });
+
     try {
-      final token = await _tokenStorage.lerToken();
-      if (token == null || token.isEmpty) {
-        throw Exception('Sessão expirada. Faça login novamente.');
-      }
-      final respostas = await Future.wait([
-        _api.get('/api/talhoes', token: token),
-        _api.get('/api/culturas', token: token),
-      ]);
-      final talhoes = _mapas(respostas[0]);
-      final culturas = _mapas(respostas[1]);
+      final listaTalhoes = await talhoes.listar();
+      final listaCulturas = await simulacao.culturas();
+
       if (!mounted) return;
+
       setState(() {
-        _talhoes = talhoes;
-        _culturas = culturas;
-        _talhaoSelecionado = talhoes.isEmpty ? null : _id(talhoes.first);
-        _culturasSelecionadas
-          ..clear()
-          ..addAll(culturas.take(2).map(_id));
+        _talhoes = listaTalhoes;
+        _culturas = listaCulturas;
+        _talhaoId ??= listaTalhoes.isEmpty ? null : listaTalhoes.first.id;
       });
-    } catch (erro) {
-      if (mounted) setState(() => _erro = erro.toString());
+    } catch (e) {
+      if (mounted) setState(() => _erro = _mensagem(e));
     } finally {
       if (mounted) setState(() => _carregando = false);
     }
   }
 
-  List<Map<String, dynamic>> _mapas(dynamic resposta) {
-    if (resposta is! List) {
-      throw const FormatException('O servidor retornou uma lista inválida.');
-    }
-    return resposta
-        .whereType<Map>()
-        .map((item) => Map<String, dynamic>.from(item))
-        .toList();
+  void _alternar(String id, bool marcada) {
+    setState(() {
+      if (marcada) {
+        if (_selecionadas.length < _maximo) _selecionadas.add(id);
+      } else {
+        _selecionadas.remove(id);
+      }
+    });
   }
 
-  String _id(Map<String, dynamic> item) => item['id']?.toString() ?? '';
-
   Future<void> _simular() async {
-    final talhaoId = _talhaoSelecionado;
-    if (talhaoId == null || talhaoId.isEmpty) return;
-    if (_culturasSelecionadas.length < 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selecione de 2 a 3 culturas para comparar.'),
-        ),
-      );
+    final talhaoId = _talhaoId;
+
+    if (_simulando || talhaoId == null || _selecionadas.length < _minimo) {
       return;
     }
+
+    final repo = context.read<SimulacaoRepository>();
+
     setState(() {
       _simulando = true;
-      _erro = null;
+      _mostrandoResultado = true;
+      _erroSimulacao = null;
       _resultado = null;
     });
+
     try {
-      final token = await _tokenStorage.lerToken();
-      if (token == null || token.isEmpty) {
-        throw Exception('Sessão expirada. Faça login novamente.');
-      }
-      final resposta = await _api.post('/api/talhoes/$talhaoId/simulacoes', {
-        'culturaIds': _culturasSelecionadas.toList(),
-      }, token: token);
-      if (mounted) setState(() => _resultado = resposta);
-    } catch (erro) {
-      if (mounted) setState(() => _erro = erro.toString());
+      final resultado = await repo.simular(talhaoId, _selecionadas.toList());
+
+      if (mounted) setState(() => _resultado = resultado);
+    } catch (e) {
+      if (mounted) setState(() => _erroSimulacao = _mensagem(e));
     } finally {
       if (mounted) setState(() => _simulando = false);
     }
   }
 
-  void _alternarCultura(String id, bool selecionada) {
+  void _novaSimulacao() {
     setState(() {
+      _mostrandoResultado = false;
       _resultado = null;
-      if (selecionada) {
-        if (_culturasSelecionadas.length < 3) {
-          _culturasSelecionadas.add(id);
-        }
-      } else {
-        _culturasSelecionadas.remove(id);
-      }
+      _erroSimulacao = null;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final desktop = constraints.maxWidth >= 850;
-        return Scaffold(
-          key: _scaffoldKey,
-          backgroundColor: Colors.white,
-          appBar: desktop
-              ? null
-              : AppBar(
-                  backgroundColor: AppColors.painel,
-                  foregroundColor: AppColors.verdeEscuro,
-                  title: const Text('Simulação de Rotação'),
-                ),
-          drawer: desktop
-              ? null
-              : Drawer(
-                  backgroundColor: AppColors.painel,
-                  child: SafeArea(child: _menuLateral()),
-                ),
-          body: SafeArea(
-            top: desktop,
-            child: Row(
-              children: [
-                if (desktop) _menuLateral(),
-                Expanded(child: _conteudo()),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    if (_mostrandoResultado) {
+      return RecomendacoesView(
+        nomeTalhao: _talhao?.nome ?? '',
+        resultado: _resultado,
+        carregando: _simulando,
+        erro: _erroSimulacao,
+        aoTentarNovamente: _simular,
+        aoNovaSimulacao: _novaSimulacao,
+      );
+    }
+
+    if (_carregando) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_erro != null) {
+      return _Mensagem(
+        texto: _erro!,
+        botao: 'Tentar novamente',
+        aoTocar: _carregar,
+      );
+    }
+
+    if (_talhoes.isEmpty) {
+      return const _Mensagem(
+        texto:
+            'Cadastre ao menos um talhão na aba Talhões para simular a rotação.',
+      );
+    }
+
+    return _formulario(context);
   }
 
-  Widget _menuLateral() => Container(
-    width: 180,
-    color: AppColors.painel,
-    padding: const EdgeInsets.all(12),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          'Prontuário Digital do Talhão',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.verdeEscuro,
-          ),
-        ),
-        const SizedBox(height: 24),
-        _itemMenu(Icons.grid_view_outlined, 'Dashboard'),
-        _itemMenu(Icons.layers_outlined, 'Talhões'),
-        _itemMenu(
-          Icons.energy_savings_leaf_outlined,
-          'Simulação de Rotação',
-          selecionado: true,
-        ),
-        _itemMenu(
-          Icons.person_outline,
-          'Perfil',
-          onTap: () => Navigator.of(
-            context,
-          ).push(MaterialPageRoute<void>(builder: (_) => const PerfilScreen())),
-        ),
-      ],
-    ),
-  );
+  Widget _formulario(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
+    final faltam = _minimo - _selecionadas.length;
 
-  Widget _itemMenu(
-    IconData icone,
-    String texto, {
-    bool selecionado = false,
-    VoidCallback? onTap,
-  }) => ListTile(
-    dense: true,
-    selected: selecionado,
-    leading: Icon(icone, size: 18),
-    title: Text(texto, style: const TextStyle(fontSize: 12)),
-    onTap: () {
-      _scaffoldKey.currentState?.closeDrawer();
-      if (onTap != null) {
-        onTap();
-      } else if (!selecionado) {
-        widget.onNavigate?.call(texto);
-      }
-    },
-  );
-
-  Widget _conteudo() => LayoutBuilder(
-    builder: (context, constraints) => SingleChildScrollView(
-      padding: EdgeInsets.all(constraints.maxWidth < 500 ? 16 : 24),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1000),
+          constraints: const BoxConstraints(maxWidth: 720),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Simulação de Rotação',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.verdeEscuro,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Compare culturas usando o histórico e as análises reais do talhão.',
-                style: TextStyle(color: AppColors.textoSecundario),
+              Text('Simulação de rotação', style: textos.headlineMedium),
+              const SizedBox(height: 4),
+              Text(
+                'Compare de 2 a 3 culturas para a próxima safra do talhão.',
+                style: textos.bodySmall,
               ),
               const SizedBox(height: 24),
-              if (_carregando) const Center(child: CircularProgressIndicator()),
-              if (_erro != null) _erroWidget(),
-              if (!_carregando) ...[
-                if (_talhoes.isEmpty)
-                  _aviso('Nenhum talhão cadastrado para esta conta.')
-                else ...[
-                  _secao('1. Escolha o talhão'),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _talhoes.map(_talhaoChip).toList(),
-                  ),
-                  const SizedBox(height: 18),
-                  _resumoTalhao(),
-                  const SizedBox(height: 24),
-                  _secao('2. Escolha de 2 a 3 culturas'),
-                  const SizedBox(height: 8),
-                  if (_culturas.isEmpty)
-                    _aviso('O catálogo de culturas não está disponível.')
-                  else
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _culturas.map(_culturaChip).toList(),
-                    ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: _simulando || _culturasSelecionadas.length < 2
-                        ? null
-                        : _simular,
-                    icon: _simulando
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.compare_arrows),
-                    label: Text(
-                      _simulando ? 'Calculando...' : 'Comparar culturas',
-                    ),
-                  ),
-                  if (_resultado != null) ...[
-                    const SizedBox(height: 24),
-                    _resultadoWidget(),
-                  ],
+              DropdownButtonFormField<String>(
+                initialValue: _talhaoId,
+                decoration: const InputDecoration(labelText: 'Talhão'),
+                items: [
+                  for (final t in _talhoes)
+                    DropdownMenuItem(value: t.id, child: Text(t.nome)),
                 ],
+                onChanged: (id) => setState(() => _talhaoId = id),
+              ),
+              const SizedBox(height: 24),
+              Text('Culturas a comparar', style: textos.titleMedium),
+              const SizedBox(height: 4),
+              Text(
+                '${_selecionadas.length} de $_maximo escolhidas',
+                style: textos.bodySmall?.copyWith(fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final cultura in _culturas)
+                    FilterChip(
+                      label: Text(cultura.nome),
+                      selected: _selecionadas.contains(cultura.id),
+                      selectedColor: AppColors.selecao,
+                      checkmarkColor: AppColors.verdeEscuro,
+                      // Com o limite atingido, só dá para desmarcar.
+                      onSelected:
+                          _selecionadas.contains(cultura.id) ||
+                              _selecionadas.length < _maximo
+                          ? (marcada) => _alternar(cultura.id, marcada)
+                          : null,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (faltam > 0)
+                Text(
+                  'Escolha mais $faltam ${faltam == 1 ? 'cultura' : 'culturas'} para comparar.',
+                  style: textos.bodySmall?.copyWith(fontSize: 14),
+                ),
+              const SizedBox(height: 24),
+              AppButton(
+                texto: 'Simular rotação',
+                onPressed: _selecionadas.length >= _minimo ? _simular : null,
+              ),
+              const SizedBox(height: 16),
+              Text(AppTextos.avisoRecomendacao, style: textos.bodySmall),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Mensagem extends StatelessWidget {
+  const _Mensagem({required this.texto, this.botao, this.aoTocar});
+
+  final String texto;
+  final String? botao;
+  final VoidCallback? aoTocar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                texto,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              if (botao != null) ...[
+                const SizedBox(height: 16),
+                AppButton(texto: botao!, onPressed: aoTocar),
               ],
             ],
           ),
         ),
       ),
-    ),
-  );
-
-  Widget _secao(String texto) => Text(
-    texto,
-    style: const TextStyle(
-      fontSize: 16,
-      fontWeight: FontWeight.w600,
-      color: AppColors.verdeEscuro,
-    ),
-  );
-
-  Widget _talhaoChip(Map<String, dynamic> talhao) {
-    final id = _id(talhao);
-    final nome = talhao['nome']?.toString() ?? 'Talhão';
-    final area = talhao['areaHa']?.toString();
-    return ChoiceChip(
-      label: Text(area == null ? nome : '$nome · $area ha'),
-      selected: id == _talhaoSelecionado,
-      onSelected: (_) => setState(() {
-        _talhaoSelecionado = id;
-        _resultado = null;
-      }),
     );
   }
-
-  Widget _culturaChip(Map<String, dynamic> cultura) {
-    final id = _id(cultura);
-    final nome = cultura['nome']?.toString() ?? id;
-    return FilterChip(
-      label: Text(nome),
-      selected: _culturasSelecionadas.contains(id),
-      onSelected: (selecionada) {
-        if (selecionada && _culturasSelecionadas.length >= 3) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Você pode comparar até 3 culturas por vez.'),
-            ),
-          );
-          return;
-        }
-        _alternarCultura(id, selecionada);
-      },
-    );
-  }
-
-  Widget _resumoTalhao() {
-    final talhao = _talhoes
-        .where((item) => _id(item) == _talhaoSelecionado)
-        .firstOrNull;
-    if (talhao == null) return const SizedBox.shrink();
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.painel,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Wrap(
-        spacing: 24,
-        runSpacing: 10,
-        children: [
-          _dado('Área', '${talhao['areaHa'] ?? '—'} ha'),
-          _dado('Safras registradas', '${talhao['totalPlantios'] ?? 0}'),
-          _dado('Análises de solo', '${talhao['totalAnalises'] ?? 0}'),
-        ],
-      ),
-    );
-  }
-
-  Widget _dado(String rotulo, String valor) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        rotulo,
-        style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario),
-      ),
-      Text(
-        valor,
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-          color: AppColors.texto,
-        ),
-      ),
-    ],
-  );
-
-  Widget _resultadoWidget() {
-    final resposta = _resultado!;
-    final status = Map<String, dynamic>.from(
-      resposta['statusSolo'] as Map? ?? {},
-    );
-    final historico = (resposta['historicoConsiderado'] as List? ?? [])
-        .map((e) => e.toString())
-        .toList();
-    final cenarios = _mapas(resposta['cenarios'] ?? []);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _secao('Resultado da simulação'),
-        const SizedBox(height: 10),
-        if (resposta['opcoesEquivalentes'] == true)
-          _aviso(
-            resposta['mensagemEquivalencia']?.toString() ??
-                'As opções são equivalentes.',
-          ),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.painel,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Status do solo: ${status['status'] ?? 'Sem análise'}',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              if (historico.isNotEmpty)
-                Text('Histórico considerado: ${historico.join(' · ')}'),
-              if (status['aviso'] != null) Text(status['aviso'].toString()),
-              if (status['motivos'] is List &&
-                  (status['motivos'] as List).isNotEmpty)
-                Text(
-                  'Pontos de atenção: ${(status['motivos'] as List).join(', ')}',
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        ...cenarios.map(_cenarioCard),
-        if (resposta['aviso'] != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            resposta['aviso'].toString(),
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textoSecundario,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _cenarioCard(Map<String, dynamic> cenario) {
-    final regras = _mapas(cenario['regras'] ?? []);
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.borda),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '${cenario['culturaNome'] ?? 'Cultura'} · ${_rotuloClassificacao(cenario['classificacao']?.toString())}',
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              color: AppColors.verdeEscuro,
-            ),
-          ),
-          if (regras.isEmpty)
-            const Text('Nenhuma regra adicional foi acionada.'),
-          ...regras.map(
-            (regra) => Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                '${regra['efeito'] ?? 'Informação'}: ${regra['mensagem'] ?? ''}',
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _rotuloClassificacao(String? valor) => switch (valor) {
-    'RECOMENDADO' => 'Recomendado',
-    'ACEITAVEL' => 'Aceitável',
-    'NAO_RECOMENDADO' => 'Não recomendado',
-    _ => valor ?? 'Sem classificação',
-  };
-
-  Widget _erroWidget() => Container(
-    width: double.infinity,
-    margin: const EdgeInsets.only(bottom: 16),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: const Color(0xFFFFF0EA),
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Não foi possível carregar a simulação: $_erro'),
-        TextButton.icon(
-          onPressed: _carregarDados,
-          icon: const Icon(Icons.refresh),
-          label: const Text('Tentar novamente'),
-        ),
-      ],
-    ),
-  );
-
-  Widget _aviso(String texto) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: AppColors.painel,
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Text(texto),
-  );
 }

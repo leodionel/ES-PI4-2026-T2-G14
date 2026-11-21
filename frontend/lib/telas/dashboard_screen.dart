@@ -1,603 +1,528 @@
-
 import 'package:flutter/material.dart';
-import 'talhoes_screen.dart';
-import 'perfil_screen.dart';
-import 'simulacao_rotacao.dart';
+import 'package:provider/provider.dart';
 
-class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+import '../core/app_exception.dart';
+import '../core/app_textos.dart';
+import '../core/theme/app_colors.dart';
+import '../core/widgets/app_button.dart';
+import '../core/widgets/status_chip.dart';
+import '../data/repositories/perfil_repository.dart';
+import '../data/repositories/talhao_repository.dart';
+import '../domain/models/talhao_resumo.dart';
 
-  // Paleta de cores
-  final Color corFundo = const Color(0xFFF7F5EE);
-  final Color corCard = const Color(0xFFF0EBE1);
-  final Color corVerdeEscuro = const Color(0xFF4A5D23);
-  final Color corVerdeClaro = const Color(0xFF8DA259);
+// Painel da propriedade (RF14, RF15 e RF16). Todos os números vêm do backend.
+class DashboardScreen extends StatefulWidget {
+  const DashboardScreen({
+    super.key,
+    required this.aoAbrirTalhoes,
+    required this.aoAbrirSimulacao,
+  });
 
-  // Abre a tela de talhões
-  void _abrirTalhoes(BuildContext context, {bool abrirCadastro = false}) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            TalhoesScreen(abrirCadastroAoEntrar: abrirCadastro),
+  final VoidCallback aoAbrirTalhoes;
+  final VoidCallback aoAbrirSimulacao;
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  bool _carregando = true;
+  String? _erro;
+  PerfilCompleto? _perfil;
+  List<TalhaoResumo> _talhoes = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _carregar());
+  }
+
+  Future<void> _carregar() async {
+    final perfis = context.read<PerfilRepository>();
+    final talhoes = context.read<TalhaoRepository>();
+
+    setState(() {
+      _carregando = true;
+      _erro = null;
+    });
+
+    try {
+      final perfil = await perfis.buscar();
+      final lista = await talhoes.listar();
+
+      if (!mounted) return;
+
+      setState(() {
+        _perfil = perfil;
+        _talhoes = lista;
+      });
+    } on AppException catch (e) {
+      if (mounted) setState(() => _erro = e.mensagem);
+    } catch (_) {
+      if (mounted) setState(() => _erro = AppTextos.erroInesperado);
+    } finally {
+      if (mounted) setState(() => _carregando = false);
+    }
+  }
+
+  int _quantos(StatusSolo status) =>
+      _talhoes.where((t) => t.status == status).length;
+
+  String _primeiroNome(String nome) {
+    final partes = nome.trim().split(RegExp(r'\s+'));
+
+    return partes.first.isEmpty ? '' : partes.first;
+  }
+
+  String _hectares(double valor) =>
+      '${valor.toStringAsFixed(1).replaceAll('.', ',')} ha';
+
+  @override
+  Widget build(BuildContext context) {
+    if (_carregando && _perfil == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_erro != null && _perfil == null) {
+      return _EstadoErro(mensagem: _erro!, aoTentarNovamente: _carregar);
+    }
+
+    return RefreshIndicator(
+      onRefresh: _carregar,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final largura = constraints.maxWidth;
+
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(
+              horizontal: largura >= 700 ? 32 : 16,
+              vertical: 24,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1100),
+                child: _conteudo(),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  void _abrirSimulacao(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute<void>(builder: (_) => const SimulacaoRotacao()),
+  Widget _conteudo() {
+    final textos = Theme.of(context).textTheme;
+    final nome = _primeiroNome(_perfil?.nome ?? '');
+    final propriedade = _perfil?.propriedade?.nome;
+
+    final areaTotal = _talhoes.fold<double>(0, (soma, t) => soma + t.areaHa);
+    final total = _talhoes.length;
+    final precisamAtencao = _talhoes
+        .where((t) => t.status == StatusSolo.risco || t.status == StatusSolo.atencao)
+        .toList()
+      ..sort((a, b) => b.status.index.compareTo(a.status.index));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 16,
+          runSpacing: 12,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  nome.isEmpty ? 'Olá!' : 'Olá, $nome',
+                  style: textos.headlineMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  propriedade == null || propriedade.isEmpty
+                      ? 'Cadastre sua propriedade ao criar o primeiro talhão.'
+                      : 'Panorama geral da $propriedade.',
+                  style: textos.bodySmall,
+                ),
+              ],
+            ),
+            ElevatedButton.icon(
+              onPressed: widget.aoAbrirTalhoes,
+              icon: const Icon(Icons.add),
+              label: const Text('Novo talhão'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        if (_erro != null) ...[
+          _AvisoErro(mensagem: _erro!),
+          const SizedBox(height: 16),
+        ],
+        if (total == 0)
+          _SemTalhoes(aoCadastrar: widget.aoAbrirTalhoes)
+        else ...[
+          _Indicadores(
+            itens: [
+              _Indicador('Área total', _hectares(areaTotal), '$total ${total == 1 ? 'talhão cadastrado' : 'talhões cadastrados'}'),
+              _Indicador('Saudáveis', '${_quantos(StatusSolo.saudavel)}', _percentual(_quantos(StatusSolo.saudavel), total)),
+              _Indicador('Em atenção', '${_quantos(StatusSolo.atencao)}', _percentual(_quantos(StatusSolo.atencao), total)),
+              _Indicador('Em risco', '${_quantos(StatusSolo.risco)}', _percentual(_quantos(StatusSolo.risco), total)),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _SaudeDoSolo(
+            talhoes: _talhoes,
+            precisamAtencao: precisamAtencao,
+            quantos: _quantos,
+          ),
+        ],
+        const SizedBox(height: 24),
+        _ChamadaSimulacao(aoSimular: widget.aoAbrirSimulacao),
+      ],
     );
   }
 
+  String _percentual(int parte, int total) {
+    if (total == 0) return '';
+    return '${(parte * 100 / total).round()}% da propriedade';
+  }
+}
+
+class _Indicador {
+  const _Indicador(this.rotulo, this.valor, this.detalhe);
+
+  final String rotulo;
+  final String valor;
+  final String detalhe;
+}
+
+// Quatro números principais, em grade que se ajusta à largura.
+class _Indicadores extends StatelessWidget {
+  const _Indicadores({required this.itens});
+
+  final List<_Indicador> itens;
+
   @override
   Widget build(BuildContext context) {
-    final largura = MediaQuery.sizeOf(context).width;
-    return Scaffold(
-      backgroundColor: corFundo,
-      drawer: largura < 700 ? Drawer(child: _buildSidebar(context)) : null,
-      appBar: largura < 700
-          ? AppBar(
-              title: const Text('Prontuário Digital do Talhão'),
-              backgroundColor: corCard,
-              foregroundColor: corVerdeEscuro,
-            )
-          : null,
-      body: Row(
-        children: [
-          // MENU LATERAL
-          if (largura >= 700) _buildSidebar(context),
+    final textos = Theme.of(context).textTheme;
 
-          // CONTEÚDO PRINCIPAL
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.all(largura < 700 ? 16.0 : 32.0),
-              child: ListView(
-                children: [
-                  // CABEÇALHO
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Olá, Leonardo',
-                              style: TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: corVerdeEscuro,
-                                fontFamily: 'Serif',
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Aqui está o panorama geral da Fazenda Santa Clara hoje.',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.black54,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+    // Usa a largura realmente disponível para decidir quantas colunas cabem.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final disponivel = constraints.maxWidth;
+        final colunas = disponivel >= 800 ? 4 : (disponivel >= 440 ? 2 : 1);
+        const espaco = 16.0;
+        final larguraItem = (disponivel - espaco * (colunas - 1)) / colunas;
 
-                      const SizedBox(width: 16),
-
-                      // BOTÃO NOVO TALHÃO
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          _abrirTalhoes(context, abrirCadastro: true);
-                        },
-                        icon: const Icon(Icons.add),
-                        label: const Text('Novo Talhão'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: corVerdeClaro,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // CARDS DE INDICADORES
-                  Row(
-                    children: [
-                      _buildKpiCard(
-                        'Área total',
-                        '128,4 ha',
-                        '4 Talhões cadastrados',
-                      ),
-                      const SizedBox(width: 16),
-                      _buildKpiCard(
-                        'Talhões saudáveis',
-                        '2',
-                        '50% da propriedade',
-                        textColor: corVerdeClaro,
-                      ),
-                      const SizedBox(width: 16),
-                      _buildKpiCard(
-                        'Em atenção',
-                        '1',
-                        'Nitrogênio baixo',
-                        textColor: Colors.orange,
-                      ),
-                      const SizedBox(width: 16),
-                      _buildKpiCard(
-                        'Em risco',
-                        '1',
-                        'pH fora da faixa',
-                        textColor: Colors.redAccent,
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // SAÚDE DO SOLO E ATIVIDADE RECENTE
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // SAÚDE DO SOLO
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: corCard,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Saúde geral do solo',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: corVerdeEscuro,
-                                ),
-                              ),
-                              const Text(
-                                'Distribuição de status entre os talhões da propriedade',
-                                style: TextStyle(color: Colors.black54),
-                              ),
-
-                              const SizedBox(height: 16),
-
-                              // Barra de status
-                              Row(
-                                children: [
-                                  Expanded(
-                                    flex: 2,
-                                    child: Container(
-                                      height: 12,
-                                      color: corVerdeClaro,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Container(
-                                      height: 12,
-                                      color: Colors.orange,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Container(
-                                      height: 12,
-                                      color: Colors.redAccent,
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 24),
-
-                              const Text(
-                                'Talhões que precisam de atenção',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-
-                              const SizedBox(height: 16),
-
-                              _buildAlertItem(
-                                'Talhão 2 - Soja',
-                                'pH fora da faixa ideal • último laudo em 14 jan 2026',
-                                'Risco',
-                                Colors.redAccent,
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              _buildAlertItem(
-                                'Talhão 3 - Feijão',
-                                'Nitrogênio baixo • recomenda-se rotação',
-                                'Atenção',
-                                Colors.orange,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(width: 24),
-
-                      // ATIVIDADE RECENTE
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: corCard,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Atividade recente',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: corVerdeEscuro,
-                                ),
-                              ),
-
-                              const SizedBox(height: 16),
-
-                              _buildActivityItem(
-                                'Análise de solo - Talhão 04',
-                                '10 jan 2026',
-                                Colors.orangeAccent,
-                              ),
-
-                              _buildActivityItem(
-                                'Praga identificada - Talhão 02',
-                                '12 jan 2026',
-                                Colors.redAccent,
-                              ),
-
-                              _buildActivityItem(
-                                'Plantio de Batata - Talhão 04',
-                                '15 nov 2025',
-                                corVerdeClaro,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // BANNER INFERIOR
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: corVerdeEscuro,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
+        return Wrap(
+          spacing: espaco,
+          runSpacing: espaco,
+          children: [
+            for (final item in itens)
+              SizedBox(
+                width: larguraItem,
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Pronto para planejar a próxima safra?',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'Compare cenários de rotação com base no histórico dos seus talhões',
-                                style: TextStyle(color: Colors.white70),
-                              ),
-                            ],
+                        Text(item.rotulo, style: textos.bodySmall),
+                        const SizedBox(height: 6),
+                        Text(
+                          item.valor,
+                          style: textos.headlineMedium?.copyWith(
+                            color: AppColors.texto,
                           ),
                         ),
-
-                        const SizedBox(width: 16),
-
-                        ElevatedButton(
-                          onPressed: () {
-                            _abrirSimulacao(context);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: corVerdeEscuro,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 16,
-                            ),
-                          ),
-                          child: const Text(
-                            'Simular Rotação',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.detalhe,
+                          style: textos.bodySmall?.copyWith(fontSize: 14),
                         ),
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-        ],
-      ),
+          ],
+        );
+      },
     );
   }
+}
 
-  // MENU LATERAL
-  Widget _buildSidebar(BuildContext context) {
-    return Container(
-      width: 250,
-      color: corCard,
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Prontuário Digital\ndo Talhão',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: corVerdeEscuro,
-              fontFamily: 'Serif',
-            ),
-          ),
+// Distribuição por status (RF15) e talhões que pedem atenção (RF16).
+class _SaudeDoSolo extends StatelessWidget {
+  const _SaudeDoSolo({
+    required this.talhoes,
+    required this.precisamAtencao,
+    required this.quantos,
+  });
 
-          const SizedBox(height: 40),
+  final List<TalhaoResumo> talhoes;
+  final List<TalhaoResumo> precisamAtencao;
+  final int Function(StatusSolo) quantos;
 
-          const Text(
-            'GESTÃO DA FAZENDA',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
-          ),
+  @override
+  Widget build(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
 
-          const SizedBox(height: 16),
-
-          // DASHBOARD
-          _buildMenuItem(
-            Icons.dashboard,
-            'Dashboard',
-            isActive: true,
-            onTap: () {
-              Navigator.of(context).popUntil((route) => route.isFirst);
-            },
-          ),
-
-          // TALHÕES
-          _buildMenuItem(
-            Icons.layers,
-            'Talhões',
-            onTap: () {
-              _abrirTalhoes(context);
-            },
-          ),
-
-          // SIMULAÇÃO
-          _buildMenuItem(
-            Icons.autorenew,
-            'Simulação de Rotação',
-            onTap: () {
-              _abrirSimulacao(context);
-            },
-          ),
-
-          // PERFIL
-         _buildMenuItem(
-  Icons.person,
-  'Perfil',
-  onTap: () {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const PerfilScreen(),
-      ),
-    );
-  },
-),
-
-          const Spacer(),
-
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white54,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Área monitorada',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Text('128.4 ha', style: TextStyle(fontSize: 20)),
-                Text(
-                  '6 talhões cadastrados\n3 alertas ativos',
-                  style: TextStyle(fontSize: 10, color: Colors.black54),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ITEM DO MENU COM NAVEGAÇÃO
-  Widget _buildMenuItem(
-    IconData icon,
-    String title, {
-    bool isActive = false,
-    VoidCallback? onTap,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: isActive ? Colors.white : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: isActive ? corVerdeEscuro : Colors.black54),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: isActive ? corVerdeEscuro : Colors.black87,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-        onTap: onTap,
-      ),
-    );
-  }
-
-  // CARDS
-  Widget _buildKpiCard(
-    String title,
-    String value,
-    String subtitle, {
-    Color? textColor,
-  }) {
-    return Expanded(
-      child: Container(
+    return Card(
+      child: Padding(
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: corCard,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text('Saúde geral do solo', style: textos.titleLarge),
+            const SizedBox(height: 4),
             Text(
-              title,
-              style: const TextStyle(fontSize: 14, color: Colors.black87),
+              'Distribuição dos talhões pelo resultado da última análise.',
+              style: textos.bodySmall,
             ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: textColor ?? Colors.black,
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                height: 12,
+                child: Row(
+                  children: [
+                    for (final status in StatusSolo.values)
+                      if (quantos(status) > 0)
+                        Expanded(
+                          flex: quantos(status),
+                          child: ColoredBox(
+                            color: StatusChip.corDo(status),
+                            child: const SizedBox.expand(),
+                          ),
+                        ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: textColor?.withValues(alpha: 0.7) ?? Colors.black54,
-              ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 16,
+              runSpacing: 8,
+              children: [
+                for (final status in StatusSolo.values)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: StatusChip.corDo(status),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${status.rotulo}: ${quantos(status)}',
+                        style: textos.bodySmall?.copyWith(
+                          color: AppColors.texto,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
             ),
+            const SizedBox(height: 12),
+            // Explica o que "Saudável" significa (RN02).
+            Text(
+              '"Saudável" quer dizer apenas que nenhum indicador avaliado '
+              'acendeu alerta. Não substitui a avaliação de um agrônomo.',
+              style: textos.bodySmall?.copyWith(fontSize: 14),
+            ),
+            const Divider(height: 32),
+            Text('Talhões que precisam de atenção', style: textos.titleMedium),
+            const SizedBox(height: 12),
+            if (precisamAtencao.isEmpty)
+              Text(
+                'Nenhum talhão com alerta no momento.',
+                style: textos.bodySmall,
+              )
+            else
+              for (final t in precisamAtencao) _LinhaAtencao(talhao: t),
           ],
         ),
       ),
     );
   }
+}
 
-  // ALERTAS
-  Widget _buildAlertItem(
-    String title,
-    String subtitle,
-    String tag,
-    Color tagColor,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        border: Border.all(color: tagColor.withValues(alpha: 0.3)),
-        borderRadius: BorderRadius.circular(8),
-      ),
+class _LinhaAtencao extends StatelessWidget {
+  const _LinhaAtencao({required this.talhao});
+
+  final TalhaoResumo talhao;
+
+  @override
+  Widget build(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
+    final motivo = talhao.motivos.isEmpty
+        ? 'Sem detalhes do indicador.'
+        : talhao.motivos.join(', ');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  talhao.culturaAtual == null
+                      ? talhao.nome
+                      : '${talhao.nome} · ${talhao.culturaAtual}',
+                  style: textos.titleMedium,
                 ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
-                ),
+                const SizedBox(height: 2),
+                Text(motivo, style: textos.bodySmall?.copyWith(fontSize: 14)),
               ],
             ),
           ),
+          const SizedBox(width: 12),
+          StatusChip(talhao.status),
+        ],
+      ),
+    );
+  }
+}
 
-          const SizedBox(width: 8),
+class _ChamadaSimulacao extends StatelessWidget {
+  const _ChamadaSimulacao({required this.aoSimular});
 
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: tagColor.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              tag,
-              style: TextStyle(
-                color: tagColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+  final VoidCallback aoSimular;
+
+  @override
+  Widget build(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.verdeEscuro,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 16,
+        runSpacing: 12,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Pronto para planejar a próxima safra?',
+                style: textos.titleLarge?.copyWith(color: AppColors.fundo),
               ),
+              const SizedBox(height: 4),
+              Text(
+                'Compare cenários de rotação com base no histórico dos seus talhões.',
+                style: textos.bodyMedium?.copyWith(color: AppColors.fundo),
+              ),
+            ],
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.fundo,
+              foregroundColor: AppColors.verdeEscuro,
+              minimumSize: const Size(48, 48),
             ),
+            onPressed: aoSimular,
+            child: const Text('Simular rotação'),
           ),
         ],
       ),
     );
   }
+}
 
-  // ATIVIDADE RECENTE
-  Widget _buildActivityItem(String title, String date, Color iconColor) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.circle, size: 12, color: iconColor),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                Text(
-                  date,
-                  style: const TextStyle(color: Colors.black54, fontSize: 12),
-                ),
-                const Divider(),
-              ],
+class _SemTalhoes extends StatelessWidget {
+  const _SemTalhoes({required this.aoCadastrar});
+
+  final VoidCallback aoCadastrar;
+
+  @override
+  Widget build(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Nenhum talhão cadastrado', style: textos.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              'Cadastre o primeiro talhão para acompanhar a área, o histórico '
+              'de plantio e o status do solo.',
+              style: textos.bodySmall,
             ),
+            const SizedBox(height: 16),
+            AppButton(texto: 'Cadastrar talhão', onPressed: aoCadastrar),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AvisoErro extends StatelessWidget {
+  const _AvisoErro({required this.mensagem});
+
+  final String mensagem;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: Text(
+        mensagem,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: Theme.of(context).colorScheme.error,
+        ),
+      ),
+    );
+  }
+}
+
+class _EstadoErro extends StatelessWidget {
+  const _EstadoErro({required this.mensagem, required this.aoTentarNovamente});
+
+  final String mensagem;
+  final VoidCallback aoTentarNovamente;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                mensagem,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              AppButton(texto: 'Tentar novamente', onPressed: aoTentarNovamente),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'data/repositories/auth_repository.dart';
 import 'telas/cadastro_screen.dart';
-import 'telas/dashboard_screen.dart';
+import 'core/widgets/app_shell.dart';
 import 'telas/login.dart';
 import 'telas/recuperacao_senha.dart';
 
@@ -32,26 +32,9 @@ class App extends StatelessWidget {
 
           // Usuário autenticado: abre o Dashboard.
           if (auth.autenticado) {
-            return Scaffold(
-              appBar: AppBar(
-                title: const Text(
-                  'Prontuário Digital do Talhão',
-                ),
-                actions: [
-                  TextButton.icon(
-                    onPressed: () async {
-                      await auth.sair();
-                    },
-                    icon: const Icon(Icons.logout),
-                    label: const Text('Sair'),
-                  ),
-                ],
-              ),
-              body: const DashboardScreen(),
-            );
+            return const AppShell();
           }
 
-          // Usuário sem sessão: abre o Login.
           return Login(
             // CADASTRO DE USUÁRIO
             aoCriarConta: () async {
