@@ -1,175 +1,435 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../data/services/api_client.dart';
-import '../data/services/token_storage.dart';
+import '../core/app_exception.dart';
+import '../core/app_textos.dart';
+import '../core/theme/app_colors.dart';
+import '../core/utils/pdf_export_service.dart';
+import '../core/widgets/app_button.dart';
+import '../core/widgets/status_chip.dart';
+import '../data/repositories/talhao_repository.dart';
+import '../domain/models/talhao_resumo.dart';
 import 'talhaodetalhe.dart';
 
-// Tela de listagem e cadastro de talhões
+// Lista de talhões (RF06 e RF07), com cadastro, edição e exclusão (RF08, RF09).
 class TalhoesScreen extends StatefulWidget {
-  const TalhoesScreen({super.key, this.abrirCadastroAoEntrar = false});
-
-  final bool abrirCadastroAoEntrar;
+  const TalhoesScreen({super.key});
 
   @override
   State<TalhoesScreen> createState() => _TalhoesScreenState();
 }
 
 class _TalhoesScreenState extends State<TalhoesScreen> {
-  final ApiClient _api = ApiClient();
-  final TokenStorage _tokenStorage = TokenStorage();
-
-  List<Map<String, dynamic>> _talhoes = [];
-
   bool _carregando = true;
-  bool _salvando = false;
+  bool _ocupado = false;
   String? _erro;
+  List<TalhaoResumo> _talhoes = const [];
+
+  TalhaoRepository get _repo => context.read<TalhaoRepository>();
 
   @override
   void initState() {
     super.initState();
-
-    _carregarTalhoes();
-
-    if (widget.abrirCadastroAoEntrar) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _abrirCadastro();
-        }
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _carregar());
   }
 
-  // RECUPERAR JWT
-  Future<String> _obterToken() async {
-    final token = await _tokenStorage.lerToken();
+  String _mensagem(Object e) =>
+      e is AppException ? e.mensagem : AppTextos.erroInesperado;
 
-    if (token == null || token.isEmpty) {
-      throw Exception('Sessão expirada. Faça login novamente.');
-    }
-
-    return token;
+  void _aviso(String texto) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(texto)));
   }
 
-  // LISTAR TALHÕES DO MONGODB
-  Future<void> _carregarTalhoes() async {
+  Future<void> _carregar() async {
     setState(() {
       _carregando = true;
       _erro = null;
     });
 
     try {
-      final token = await _obterToken();
-
-      final resposta = await _api.get('/api/talhoes', token: token);
-
-      if (resposta is! List) {
-        throw const FormatException('A API não retornou uma lista de talhões.');
-      }
-
-      final talhoes = resposta
-          .map((item) => Map<String, dynamic>.from(item as Map))
-          .toList();
+      final lista = await _repo.listar();
 
       if (!mounted) return;
 
-      setState(() {
-        _talhoes = talhoes;
-      });
+      setState(() => _talhoes = lista);
     } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        _erro = e.toString().replaceFirst('Exception: ', '');
-      });
+      if (mounted) setState(() => _erro = _mensagem(e));
     } finally {
-      if (mounted) {
-        setState(() {
-          _carregando = false;
-        });
-      }
+      if (mounted) setState(() => _carregando = false);
     }
   }
 
-  // ABRIR OS DETALHES DO TALHÃO SELECIONADO
-  Future<void> _abrirDetalhes(Map<String, dynamic> talhao) async {
-    final id = talhao['id']?.toString();
+  // Executa uma ação de escrita sem permitir cliques repetidos.
+  Future<void> _executar(Future<void> Function() acao, String sucesso) async {
+    if (_ocupado) return;
 
-    if (id == null || id.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Este talhão não possui um ID válido.')),
-      );
-      return;
+    setState(() => _ocupado = true);
+
+    try {
+      await acao();
+
+      if (!mounted) return;
+
+      _aviso(sucesso);
+      await _carregar();
+    } catch (e) {
+      if (mounted) _aviso(_mensagem(e));
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
     }
+  }
 
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => ProntuarioScreen(talhaoId: id)),
+  Future<void> _cadastrar() async {
+    if (_ocupado) return;
+
+    try {
+      // Cada produtor tem uma propriedade (RN11); ela é criada junto do
+      // primeiro talhão.
+      final existe = await _repo.temPropriedade();
+
+      if (!mounted) return;
+
+      if (!existe) {
+        final dados = await showDialog<({String nome, String localizacao})>(
+          context: context,
+          builder: (_) => const _FormularioPropriedade(),
+        );
+
+        if (dados == null || !mounted) return;
+
+        await _repo.criarPropriedade(dados.nome, dados.localizacao);
+      }
+
+      if (!mounted) return;
+
+      final talhao = await showDialog<({String nome, double area})>(
+        context: context,
+        builder: (_) => const _FormularioTalhao(),
+      );
+
+      if (talhao == null) return;
+
+      await _executar(
+        () => _repo.criar(talhao.nome, talhao.area),
+        'Talhão cadastrado.',
+      );
+    } catch (e) {
+      if (mounted) _aviso(_mensagem(e));
+    }
+  }
+
+  Future<void> _editar(TalhaoResumo talhao) async {
+    final dados = await showDialog<({String nome, double area})>(
+      context: context,
+      builder: (_) => _FormularioTalhao(talhao: talhao),
     );
 
-    // Atualizar listagem ao voltar dos detalhes
-    if (mounted) {
-      await _carregarTalhoes();
-    }
+    if (dados == null) return;
+
+    await _executar(
+      () => _repo.atualizar(talhao.id, dados.nome, dados.area),
+      'Talhão atualizado.',
+    );
   }
 
-  // FORMULÁRIO PARA RECEBER DADOS
-  Future<Map<String, String>?> _pedirDados({
-    required String titulo,
-    required String primeiroCampo,
-    required String segundoCampo,
-    required String primeiraChave,
-    required String segundaChave,
-    bool segundoNumerico = false,
-  }) async {
-    final formKey = GlobalKey<FormState>();
-
-    final primeiro = TextEditingController();
-    final segundo = TextEditingController();
-
-    final resposta = await showDialog<Map<String, String>>(
+  Future<void> _excluir(TalhaoResumo talhao) async {
+    final confirmou = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(titulo),
-        content: SizedBox(
-          width: 400,
-          child: Form(
-            key: formKey,
+      builder: (_) => _DialogoExclusao(talhao: talhao),
+    );
+
+    if (confirmou != true) return;
+
+    await _executar(
+      () => _repo.excluir(talhao.id, talhao.nome),
+      'Talhão excluído.',
+    );
+  }
+
+  Future<void> _abrirDetalhes(TalhaoResumo talhao) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ProntuarioScreen(talhaoId: talhao.id),
+      ),
+    );
+
+    // O prontuário pode ter mudado o status ou a cultura.
+    if (mounted) await _carregar();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
+
+    return RefreshIndicator(
+      onRefresh: _carregar,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(
+              horizontal: constraints.maxWidth >= 700 ? 32 : 16,
+              vertical: 24,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 900),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 16,
+                      runSpacing: 12,
+                      children: [
+                        Text('Talhões', style: textos.headlineMedium),
+                        ElevatedButton.icon(
+                          onPressed: _ocupado ? null : _cadastrar,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Novo talhão'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _corpo(textos),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _corpo(TextTheme textos) {
+    if (_carregando && _talhoes.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_erro != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              _erro!,
+              style: textos.bodyMedium?.copyWith(color: AppColors.terracota),
+            ),
+          ),
+          const SizedBox(height: 12),
+          AppButton(texto: 'Tentar novamente', onPressed: _carregar),
+        ],
+      );
+    }
+
+    if (_talhoes.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Nenhum talhão cadastrado', style: textos.titleLarge),
+              const SizedBox(height: 8),
+              Text(
+                'Informe o nome e a área do primeiro talhão para começar o '
+                'prontuário.',
+                style: textos.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              AppButton(texto: 'Cadastrar talhão', onPressed: _cadastrar),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        for (final talhao in _talhoes)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _CartaoTalhao(
+              talhao: talhao,
+              aoAbrir: () => _abrirDetalhes(talhao),
+              aoEditar: () => _editar(talhao),
+              aoExcluir: () => _excluir(talhao),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _CartaoTalhao extends StatelessWidget {
+  const _CartaoTalhao({
+    required this.talhao,
+    required this.aoAbrir,
+    required this.aoEditar,
+    required this.aoExcluir,
+  });
+
+  final TalhaoResumo talhao;
+  final VoidCallback aoAbrir;
+  final VoidCallback aoEditar;
+  final VoidCallback aoExcluir;
+
+  @override
+  Widget build(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
+    final area = talhao.areaHa.toStringAsFixed(1).replaceAll('.', ',');
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: aoAbrir,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(talhao.nome, style: textos.titleMedium),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$area ha · ${talhao.culturaAtual == null ? 'Sem cultura em andamento' : 'Cultura atual: ${talhao.culturaAtual}'}',
+                      style: textos.bodySmall?.copyWith(fontSize: 14),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        StatusChip(talhao.status),
+                        Text(
+                          '${talhao.totalPlantios} safras · ${talhao.totalAnalises} análises',
+                          style: textos.bodySmall?.copyWith(fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'Ações do talhão ${talhao.nome}',
+                onSelected: (acao) {
+                  if (acao == 'editar') aoEditar();
+                  if (acao == 'excluir') aoExcluir();
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'editar', child: Text('Editar')),
+                  PopupMenuItem(value: 'excluir', child: Text('Excluir')),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Formulário de novo talhão ou de edição (nome e área em hectares).
+class _FormularioTalhao extends StatefulWidget {
+  const _FormularioTalhao({this.talhao});
+
+  final TalhaoResumo? talhao;
+
+  @override
+  State<_FormularioTalhao> createState() => _FormularioTalhaoState();
+}
+
+class _FormularioTalhaoState extends State<_FormularioTalhao> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nome;
+  late final TextEditingController _area;
+
+  @override
+  void initState() {
+    super.initState();
+    _nome = TextEditingController(text: widget.talhao?.nome ?? '');
+    _area = TextEditingController(
+      text: widget.talhao == null
+          ? ''
+          : widget.talhao!.areaHa.toString().replaceAll('.', ','),
+    );
+  }
+
+  @override
+  void dispose() {
+    _nome.dispose();
+    _area.dispose();
+    super.dispose();
+  }
+
+  double? _lerArea(String? texto) =>
+      double.tryParse((texto ?? '').trim().replaceAll(',', '.'));
+
+  void _salvar() {
+    if (!_formKey.currentState!.validate()) return;
+
+    Navigator.of(
+      context,
+    ).pop((nome: _nome.text.trim(), area: _lerArea(_area.text)!));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final edicao = widget.talhao != null;
+
+    return AlertDialog(
+      title: Text(edicao ? 'Editar talhão' : 'Novo talhão'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextFormField(
-                  controller: primeiro,
-                  decoration: InputDecoration(labelText: primeiroCampo),
+                  controller: _nome,
+                  autofocus: true,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(labelText: 'Nome do talhão'),
                   validator: (valor) {
-                    if ((valor ?? '').trim().isEmpty) {
-                      return 'Este campo é obrigatório';
-                    }
+                    final nome = (valor ?? '').trim();
+                    if (nome.isEmpty) return 'Informe o nome do talhão.';
+                    if (nome.length > 100) return 'Use no máximo 100 caracteres.';
                     return null;
                   },
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 TextFormField(
-                  controller: segundo,
-                  decoration: InputDecoration(labelText: segundoCampo),
-                  keyboardType: segundoNumerico
-                      ? const TextInputType.numberWithOptions(decimal: true)
-                      : TextInputType.text,
+                  controller: _area,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _salvar(),
+                  decoration: const InputDecoration(
+                    labelText: 'Área (hectares)',
+                    hintText: 'Ex.: 12,5',
+                  ),
                   validator: (valor) {
-                    final texto = (valor ?? '').trim();
-
-                    if (texto.isEmpty) {
-                      return 'Este campo é obrigatório';
-                    }
-
-                    if (segundoNumerico) {
-                      final numero = double.tryParse(
-                        texto.replaceAll(',', '.'),
-                      );
-
-                      if (numero == null || !numero.isFinite || numero <= 0) {
-                        return 'Informe uma área válida maior que zero';
-                      }
-                    }
-
+                    final area = _lerArea(valor);
+                    if (area == null) return 'Informe a área em hectares.';
+                    if (area <= 0) return 'A área deve ser maior que zero.';
                     return null;
                   },
                 ),
@@ -177,207 +437,221 @@ class _TalhoesScreenState extends State<TalhoesScreen> {
             ),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-            },
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) {
-                return;
-              }
-
-              Navigator.pop(dialogContext, {
-                primeiraChave: primeiro.text.trim(),
-                segundaChave: segundo.text.trim(),
-              });
-            },
-            child: const Text('Salvar'),
-          ),
-        ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(onPressed: _salvar, child: const Text('Salvar')),
+      ],
     );
+  }
+}
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      primeiro.dispose();
-      segundo.dispose();
-    });
+// Cadastro da propriedade, pedido antes do primeiro talhão (RN11).
+class _FormularioPropriedade extends StatefulWidget {
+  const _FormularioPropriedade();
 
-    return resposta;
+  @override
+  State<_FormularioPropriedade> createState() => _FormularioPropriedadeState();
+}
+
+class _FormularioPropriedadeState extends State<_FormularioPropriedade> {
+  final _formKey = GlobalKey<FormState>();
+  final _nome = TextEditingController();
+  final _localizacao = TextEditingController();
+
+  @override
+  void dispose() {
+    _nome.dispose();
+    _localizacao.dispose();
+    super.dispose();
   }
 
-  // CADASTRAR TALHÃO NO MONGODB
-  Future<void> _abrirCadastro() async {
-    if (_salvando) return;
+  String? _obrigatorio(String? valor, String mensagem) =>
+      (valor ?? '').trim().isEmpty ? mensagem : null;
+
+  void _salvar() {
+    if (!_formKey.currentState!.validate()) return;
+
+    Navigator.of(
+      context,
+    ).pop((nome: _nome.text.trim(), localizacao: _localizacao.text.trim()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Cadastre sua propriedade'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Os talhões ficam dentro da sua propriedade. Informe o nome e onde ela fica.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _nome,
+                  autofocus: true,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'Nome da propriedade',
+                  ),
+                  validator: (v) =>
+                      _obrigatorio(v, 'Informe o nome da propriedade.'),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _localizacao,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _salvar(),
+                  decoration: const InputDecoration(
+                    labelText: 'Localização',
+                    hintText: 'Cidade e estado',
+                  ),
+                  validator: (v) => _obrigatorio(v, 'Informe a localização.'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(onPressed: _salvar, child: const Text('Continuar')),
+      ],
+    );
+  }
+}
+
+// Confirmação de exclusão (RF08 e RF09): mostra o que será removido, oferece
+// o PDF e só libera o botão quando o nome é digitado.
+class _DialogoExclusao extends StatefulWidget {
+  const _DialogoExclusao({required this.talhao});
+
+  final TalhaoResumo talhao;
+
+  @override
+  State<_DialogoExclusao> createState() => _DialogoExclusaoState();
+}
+
+class _DialogoExclusaoState extends State<_DialogoExclusao> {
+  final _confirmacao = TextEditingController();
+  bool _exportando = false;
+  String? _erroPdf;
+
+  @override
+  void dispose() {
+    _confirmacao.dispose();
+    super.dispose();
+  }
+
+  // Ignora maiúsculas e espaços nas pontas, como o servidor.
+  bool get _nomeConfere =>
+      _confirmacao.text.trim().toLowerCase() ==
+      widget.talhao.nome.trim().toLowerCase();
+
+  Future<void> _exportarPdf() async {
+    if (_exportando) return;
 
     setState(() {
-      _salvando = true;
+      _exportando = true;
+      _erroPdf = null;
     });
 
     try {
-      final token = await _obterToken();
-
-      // Verificar se existe uma propriedade
-      final propriedades = await _api.get('/api/propriedades', token: token);
-
-      if (propriedades is! List) {
-        throw const FormatException(
-          'A API não retornou uma lista de propriedades.',
-        );
-      }
-
-      if (!mounted) return;
-
-      // Cadastrar propriedade, caso não exista
-      if (propriedades.isEmpty) {
-        final propriedade = await _pedirDados(
-          titulo: 'Cadastre sua propriedade primeiro',
-          primeiroCampo: 'Nome da propriedade',
-          segundoCampo: 'Localização',
-          primeiraChave: 'nome',
-          segundaChave: 'localizacao',
-        );
-
-        if (propriedade == null) return;
-
-        await _api.post('/api/propriedades', {
-          'nome': propriedade['nome']!,
-          'localizacao': propriedade['localizacao']!,
-        }, token: token);
-      }
-
-      if (!mounted) return;
-
-      // Solicitar dados do novo talhão
-      final talhao = await _pedirDados(
-        titulo: 'Novo Talhão',
-        primeiroCampo: 'Nome do talhão',
-        segundoCampo: 'Área (hectares)',
-        primeiraChave: 'nome',
-        segundaChave: 'areaHa',
-        segundoNumerico: true,
+      final dados = await context.read<TalhaoRepository>().carregarProntuario(
+        widget.talhao.id,
       );
 
-      if (talhao == null) return;
-
-      // Enviar dados reais para API Java
-      await _api.post('/api/talhoes', {
-        'nome': talhao['nome']!,
-        'areaHa': double.parse(talhao['areaHa']!.replaceAll(',', '.')),
-      }, token: token);
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Talhão cadastrado com sucesso!')),
+      await PdfExportService.exportarProntuarioTalhao(
+        talhao: dados.talhao,
+        analises: dados.analises,
+        plantios: dados.plantios,
       );
-
-      await _carregarTalhoes();
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Não foi possível cadastrar: $e')));
-    } finally {
+    } catch (_) {
       if (mounted) {
-        setState(() {
-          _salvando = false;
-        });
+        setState(() => _erroPdf = 'Não foi possível gerar o PDF.');
       }
+    } finally {
+      if (mounted) setState(() => _exportando = false);
     }
   }
 
-  // INTERFACE
   @override
   Widget build(BuildContext context) {
-    const verde = Color(0xFF4A5D23);
+    final t = widget.talhao;
+    final textos = Theme.of(context).textTheme;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F5EE),
-
-      appBar: AppBar(
-        title: const Text('Meus Talhões'),
-        backgroundColor: const Color(0xFFF0EBE1),
-        actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.of(context).popUntil((route) => route.isFirst);
-            },
-            tooltip: 'Ir para o dashboard',
-            icon: const Icon(Icons.dashboard_outlined),
-          ),
-          IconButton(
-            onPressed: _carregando ? null : _carregarTalhoes,
-            tooltip: 'Atualizar lista',
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
-
-      body: _carregando
-          ? const Center(child: CircularProgressIndicator())
-          : _erro != null
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(_erro!, textAlign: TextAlign.center),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: _carregarTalhoes,
-                    child: const Text('Tentar novamente'),
-                  ),
-                ],
+    return AlertDialog(
+      title: Text('Excluir ${t.nome}?'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Serão removidas definitivamente ${t.totalPlantios} '
+                '${t.totalPlantios == 1 ? 'safra' : 'safras'} e '
+                '${t.totalAnalises} ${t.totalAnalises == 1 ? 'análise' : 'análises'} '
+                'deste talhão. Não é possível desfazer.',
+                style: textos.bodyMedium,
               ),
-            )
-          : _talhoes.isEmpty
-          ? const Center(
-              child: Text('Nenhum talhão cadastrado nesta propriedade.'),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(24),
-              itemCount: _talhoes.length,
-              itemBuilder: (context, index) {
-                final talhao = _talhoes[index];
-
-                final nome = talhao['nome']?.toString() ?? 'Sem nome';
-
-                final area = talhao['areaHa']?.toString() ?? '—';
-
-                final plantios = talhao['totalPlantios']?.toString() ?? '0';
-
-                final analises = talhao['totalAnalises']?.toString() ?? '0';
-
-                return Card(
-                  color: const Color(0xFFF0EBE1),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    leading: const Icon(Icons.grass, color: verde),
-                    title: Text(nome),
-                    subtitle: Text(
-                      '$area ha • $plantios plantio(s) • '
-                      '$analises análise(s)',
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      _abrirDetalhes(talhao);
-                    },
-                  ),
-                );
-              },
-            ),
-
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _salvando ? null : _abrirCadastro,
-        backgroundColor: const Color(0xFF8DA259),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: Text(_salvando ? 'Processando...' : 'Novo Talhão'),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _exportando ? null : _exportarPdf,
+                icon: _exportando
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.picture_as_pdf_outlined),
+                label: Text(_exportando ? 'Gerando PDF...' : 'Exportar prontuário em PDF'),
+              ),
+              if (_erroPdf != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _erroPdf!,
+                  style: textos.bodySmall?.copyWith(color: AppColors.terracota),
+                ),
+              ],
+              const SizedBox(height: 16),
+              TextField(
+                controller: _confirmacao,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText: 'Digite "${t.nome}" para confirmar',
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.terracota),
+          onPressed: _nomeConfere ? () => Navigator.of(context).pop(true) : null,
+          child: const Text('Excluir talhão'),
+        ),
+      ],
     );
   }
 }
