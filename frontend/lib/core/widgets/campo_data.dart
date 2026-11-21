@@ -12,10 +12,9 @@ class CampoData extends FormField<DateTime> {
     DateTime? primeira,
     DateTime? ultima,
     String mensagemObrigatorio = 'Informe a data.',
-    bool enabled = true,
+    super.enabled = true,
   }) : super(
          initialValue: valor,
-         enabled: enabled,
          autovalidateMode: AutovalidateMode.onUserInteraction,
          validator: (data) => data == null ? mensagemObrigatorio : null,
          builder: (state) {
@@ -46,7 +45,7 @@ class CampoData extends FormField<DateTime> {
              label: rotulo,
              child: InkWell(
                borderRadius: BorderRadius.circular(12),
-               onTap: enabled ? escolher : null,
+               onTap: state.widget.enabled ? escolher : null,
                child: InputDecorator(
                  decoration: InputDecoration(
                    labelText: rotulo,
