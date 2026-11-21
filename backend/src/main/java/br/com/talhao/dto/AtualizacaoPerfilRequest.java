@@ -1,10 +1,12 @@
+// Feito por Leonardo Dionel RA:25010092
+
 package br.com.talhao.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-// Dados pessoais que o produtor pode alterar no perfil.
+// Dados pessoais que o produtor23 pode alterar no perfil.
 // O e-mail nao entra aqui porque e o login da conta.
 public record AtualizacaoPerfilRequest(
 
