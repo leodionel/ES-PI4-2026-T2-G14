@@ -11,6 +11,9 @@ public class BackendClient {
 
     private final HttpClient cliente;
 
+    // Endereco base da API (usado no encaminhamento generico)
+    private final URI base;
+
     private final URI enderecoStatus;
     private final URI enderecoPropriedades;
     private final URI enderecoAnalisesSolo;
@@ -25,6 +28,7 @@ public class BackendClient {
         }
 
         URI base = URI.create(enderecoBase);
+        this.base = base;
 
         if (base.getHost() == null
                 || (!"http".equalsIgnoreCase(base.getScheme())
@@ -87,6 +91,51 @@ public class BackendClient {
         );
 
         return executarConsulta(pedido);
+    }
+
+    // Resposta HTTP repassada sem interpretacao
+    public record Resposta(int status, String tipoConteudo, byte[] corpo) {}
+
+    // Encaminha qualquer rota da API e devolve o codigo HTTP, o tipo
+    // do conteudo e o corpo, inclusive quando o codigo nao e 200
+    public Resposta encaminhar(
+            String metodo,
+            String caminho,
+            String tokenJwt,
+            byte[] corpo)
+            throws IOException, InterruptedException {
+
+        HttpRequest.BodyPublisher conteudo =
+                (corpo == null || corpo.length == 0)
+                        ? HttpRequest.BodyPublishers.noBody()
+                        : HttpRequest.BodyPublishers.ofByteArray(corpo);
+
+        HttpRequest.Builder pedido = HttpRequest.newBuilder()
+                .uri(base.resolve(caminho))
+                .timeout(Duration.ofSeconds(20))
+                .header("Accept", "*/*")
+                .method(metodo, conteudo);
+
+        if (corpo != null && corpo.length > 0) {
+            pedido.header("Content-Type", "application/json");
+        }
+
+        if (tokenJwt != null && !tokenJwt.isBlank()) {
+            pedido.header("Authorization", "Bearer " + tokenJwt.trim());
+        }
+
+        HttpResponse<byte[]> resposta = cliente.send(
+                pedido.build(),
+                HttpResponse.BodyHandlers.ofByteArray()
+        );
+
+        return new Resposta(
+                resposta.statusCode(),
+                resposta.headers()
+                        .firstValue("Content-Type")
+                        .orElse("application/json"),
+                resposta.body()
+        );
     }
 
     // Cria uma requisicao HTTP com autenticacao JWT
