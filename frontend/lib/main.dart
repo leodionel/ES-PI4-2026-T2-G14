@@ -6,6 +6,9 @@ import 'package:provider/provider.dart';
 import 'app.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/auth_repository_remote.dart';
+import 'data/repositories/perfil_repository.dart';
+import 'data/repositories/simulacao_repository.dart';
+import 'data/repositories/talhao_repository.dart';
 import 'data/services/api_client.dart';
 import 'data/services/token_storage.dart';
 import 'telas/login_view_model.dart';
@@ -22,6 +25,27 @@ void main() {
         ),
 
         Provider<TokenStorage>(create: (_) => TokenStorage()),
+
+        Provider<TalhaoRepository>(
+          create: (context) => TalhaoRepository(
+            context.read<ApiClient>(),
+            context.read<TokenStorage>(),
+          ),
+        ),
+
+        Provider<SimulacaoRepository>(
+          create: (context) => SimulacaoRepository(
+            context.read<ApiClient>(),
+            context.read<TokenStorage>(),
+          ),
+        ),
+
+        Provider<PerfilRepository>(
+          create: (context) => PerfilRepository(
+            context.read<ApiClient>(),
+            context.read<TokenStorage>(),
+          ),
+        ),
 
         ChangeNotifierProvider<AuthRepository>(
           create: (context) {
