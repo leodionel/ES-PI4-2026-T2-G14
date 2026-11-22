@@ -1,5 +1,6 @@
 
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -8,6 +9,19 @@ import java.time.Duration;
 
 // Responsavel pela comunicacao HTTP com o Spring Boot
 public class BackendClient {
+
+    // O cliente HTTP guarda conexoes abertas para reaproveitar. Se o backend
+    // ou o Docker fecham uma conexao parada, o primeiro pedido seguinte falha.
+    // Manter a conexao por pouco tempo evita esse caso. Precisa ser definido
+    // antes de o primeiro HttpClient ser criado.
+    static {
+        if (System.getProperty("jdk.httpclient.keepalive.timeout") == null) {
+            System.setProperty("jdk.httpclient.keepalive.timeout", "5");
+        }
+    }
+
+    // Espera antes de repetir um pedido que falhou ao conectar
+    private static final long PAUSA_NOVA_TENTATIVA_MS = 300;
 
     private final HttpClient cliente;
 
@@ -50,7 +64,9 @@ public class BackendClient {
                 base.resolve("/api/analises-solo");
 
         // Configuracao do cliente HTTP
+        // HTTP/1.1 evita a tentativa de atualizar para HTTP/2
         this.cliente = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();
     }
@@ -124,7 +140,7 @@ public class BackendClient {
             pedido.header("Authorization", "Bearer " + tokenJwt.trim());
         }
 
-        HttpResponse<byte[]> resposta = cliente.send(
+        HttpResponse<byte[]> resposta = enviar(
                 pedido.build(),
                 HttpResponse.BodyHandlers.ofByteArray()
         );
@@ -136,6 +152,41 @@ public class BackendClient {
                         .orElse("application/json"),
                 resposta.body()
         );
+    }
+
+    // Envia o pedido. Se a conexao falhar antes de qualquer resposta
+    // (backend ainda subindo ou conexao derrubada), tenta mais uma vez.
+    // Nesses casos o backend nao chegou a responder, e por isso a repeticao
+    // e aceitavel mesmo em POST. Tempo esgotado nao e repetido.
+    private <T> HttpResponse<T> enviar(
+            HttpRequest pedido,
+            HttpResponse.BodyHandler<T> tratador)
+            throws IOException, InterruptedException {
+
+        try {
+            return cliente.send(pedido, tratador);
+        } catch (IOException erro) {
+
+            if (!falhouAntesDaResposta(erro)) {
+                throw erro;
+            }
+
+            Thread.sleep(PAUSA_NOVA_TENTATIVA_MS);
+
+            return cliente.send(pedido, tratador);
+        }
+    }
+
+    // Conexao recusada ou fechada sem enviar nenhum byte de resposta
+    private static boolean falhouAntesDaResposta(IOException erro) {
+
+        if (erro instanceof ConnectException) {
+            return true;
+        }
+
+        String mensagem = erro.getMessage();
+
+        return mensagem != null && mensagem.contains("received no bytes");
     }
 
     // Cria uma requisicao HTTP com autenticacao JWT
@@ -165,7 +216,7 @@ public class BackendClient {
     private String executarConsulta(HttpRequest pedido)
             throws IOException, InterruptedException {
 
-        HttpResponse<String> resposta = cliente.send(
+        HttpResponse<String> resposta = enviar(
                 pedido,
                 HttpResponse.BodyHandlers.ofString()
         );

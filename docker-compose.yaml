@@ -6,6 +6,12 @@ services:
       - "127.0.0.1:27017:27017"
     volumes:
       - mongo-talhao-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
     restart: unless-stopped
 
   backend:
@@ -18,20 +24,38 @@ services:
     ports:
       - "127.0.0.1:8081:8081"
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
+    # Fica "healthy" so quando o Spring Boot termina de subir
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
     restart: unless-stopped
 
+  # O servidor Java NAO sobe junto com "docker compose up". Ele e aberto pelo
+  # comando "run-backend", que o liga a este terminal (para digitar status e
+  # desativar). Para deixar em segundo plano:
+  #   docker compose --profile segundo-plano up -d --wait
   servidor:
+    profiles: ["segundo-plano"]
     build: ./servidor
     container_name: servidor-talhao
     environment:
       BACKEND_URL: http://backend:8081
       BIND_ADDRESS: 0.0.0.0
     ports:
+      # 3000: sockets (celular e emulador). 3001: HTTP, so para o Flutter Web
       - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3001:3001"
     stdin_open: true
+    tty: true
+    # So inicia depois que o backend esta pronto para responder
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

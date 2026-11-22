@@ -3,13 +3,14 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'serializacao_java.dart';
+import 'servidor_transporte.dart';
 
 // Conexão com o servidor Java de sockets.
 //
 // Cada chamada abre uma conexão TCP, envia um PedidoRequisicao, aguarda a
 // RespostaRequisicao e fecha. Uma conexão por pedido mantém o código simples
 // e evita conexões penduradas quando o aplicativo vai para segundo plano.
-class ServidorSocket {
+class ServidorSocket implements ServidorTransporte {
   ServidorSocket({String? host, int? porta})
     : _host =
           host ??
@@ -28,7 +29,9 @@ class ServidorSocket {
   static const Duration _tempoConexao = Duration(seconds: 5);
 
   // Envia a requisição e devolve a resposta do servidor.
-  // Lança SocketException, TimeoutException ou FormatoInvalidoException.
+  // Lança ConexaoFalhouException, TimeoutException ou
+  // FormatoInvalidoException.
+  @override
   Future<RespostaServidor> enviar({
     required String metodo,
     required String caminho,
@@ -36,7 +39,15 @@ class ServidorSocket {
     Uint8List? corpo,
     Duration tempoLimite = const Duration(seconds: 15),
   }) async {
-    final socket = await Socket.connect(_host, _porta, timeout: _tempoConexao);
+    final Socket socket;
+
+    try {
+      socket = await Socket.connect(_host, _porta, timeout: _tempoConexao);
+    } on SocketException {
+      throw const ConexaoFalhouException(
+        'Não foi possível conectar ao servidor.',
+      );
+    }
 
     final trabalho = _trocarMensagens(
       socket,
@@ -50,6 +61,8 @@ class ServidorSocket {
 
     try {
       return await trabalho.timeout(tempoLimite);
+    } on SocketException {
+      throw const ConexaoFalhouException('O servidor encerrou a conexão.');
     } finally {
       socket.destroy();
 

@@ -1,5 +1,10 @@
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.AfterEach;
@@ -147,5 +152,88 @@ class BackendClientTest {
         assertEquals(409, resposta.status());
         assertEquals("{\"title\":\"Conflito\"}",
                 new String(resposta.corpo(), StandardCharsets.UTF_8));
+    }
+
+    // Servidor que aceita e fecha a primeira conexao sem responder (como
+    // acontece quando o backend ainda esta subindo) e atende as seguintes
+    @Test
+    void deveTentarDeNovoQuandoAConexaoCaiSemResposta() throws Exception {
+
+        try (ServerSocket servidor = new ServerSocket(
+                0, 50, InetAddress.getByName("127.0.0.1"))) {
+
+            int[] conexoes = {0};
+
+            Thread atendente = new Thread(() -> {
+                try {
+                    while (true) {
+                        Socket conexao = servidor.accept();
+                        conexoes[0]++;
+
+                        if (conexoes[0] == 1) {
+                            conexao.close();
+                            continue;
+                        }
+
+                        InputStream entrada = conexao.getInputStream();
+                        byte[] lixo = new byte[8192];
+                        entrada.read(lixo);
+                        conexao.setSoTimeout(200);
+
+                        try {
+                            entrada.read(lixo);
+                        } catch (SocketTimeoutException esperado) {
+                            // Fim da requisicao
+                        }
+
+                        conexao.getOutputStream().write((
+                                "HTTP/1.1 201 Created\r\n"
+                                + "Content-Length: 2\r\n"
+                                + "Connection: close\r\n\r\nok"
+                        ).getBytes(StandardCharsets.US_ASCII));
+                        conexao.close();
+                    }
+                } catch (IOException encerrado) {
+                    // O teste fechou o servidor
+                }
+            });
+            atendente.setDaemon(true);
+            atendente.start();
+
+            BackendClient clienteTeste = new BackendClient(
+                    "http://127.0.0.1:" + servidor.getLocalPort());
+
+            BackendClient.Resposta resposta = clienteTeste.encaminhar(
+                    "POST", "/api/usuarios/login", "",
+                    "{}".getBytes(StandardCharsets.UTF_8));
+
+            assertEquals(201, resposta.status());
+            assertEquals(2, conexoes[0]);
+        }
+    }
+
+    // Backend fora do ar: tenta duas vezes e entao informa a falha
+    @Test
+    void deveFalharQuandoOBackendContinuaForaDoAr() throws Exception {
+
+        int portaLivre;
+
+        try (ServerSocket reserva = new ServerSocket(0)) {
+            portaLivre = reserva.getLocalPort();
+        }
+
+        BackendClient clienteTeste =
+                new BackendClient("http://127.0.0.1:" + portaLivre);
+
+        assertThrows(IOException.class, () ->
+                clienteTeste.encaminhar("GET", "/status", "", null));
+    }
+
+    // Conexoes paradas nao ficam guardadas por muito tempo
+    @Test
+    void deveReduzirOTempoDeConexaoParada() {
+
+        assertNotNull(
+                System.getProperty("jdk.httpclient.keepalive.timeout"));
     }
 }
