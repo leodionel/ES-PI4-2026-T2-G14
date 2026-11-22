@@ -9,13 +9,15 @@ Aplicativo para pequenos e médios produtores rurais. O produtor cadastra seus t
 ## Como o sistema é montado
 
 ```
-App Flutter ──► Servidor de sockets (Java, porta 3000) ──► Backend (Spring Boot, porta 8081) ──► MongoDB
+App Flutter ──► Servidor Java (sockets, porta 3000) ──► Backend (Spring Boot, porta 8081) ──► MongoDB
 ```
+
+No navegador (Chrome/Edge) o app usa a porta HTTP 3001 do mesmo servidor, porque o navegador não abre sockets. O caminho dos dados é o mesmo.
 
 | Pasta | O que é |
 |---|---|
 | `frontend/` | O aplicativo (Flutter) |
-| `servidor/` | Servidor Java de sockets. O app fala só com ele |
+| `servidor/` | Servidor Java (sockets na 3000, HTTP na 3001 só para o navegador). O app fala só com ele |
 | `backend/` | API REST (Java 17 + Spring Boot) |
 | `docs/` | Requisitos, regras agronômicas, modelo de dados, protocolo dos sockets |
 
@@ -27,13 +29,28 @@ O app **não** chama a API direto: todo pedido passa pelo servidor de sockets, q
 
 | Para quê | Programa |
 |---|---|
-| Rodar banco, backend e servidor | [Docker Desktop](https://www.docker.com/products/docker-desktop/) |
-| Rodar o app | [Flutter](https://docs.flutter.dev/get-started/install) + Android Studio (com um emulador Android criado) |
+| Rodar banco, backend e servidor | [Docker Desktop](https://www.docker.com/products/docker-desktop/) (precisa estar aberto) |
+| Rodar o app | [Flutter](https://docs.flutter.dev/get-started/install) |
+| Rodar no celular virtual (opcional) | Android Studio com um emulador Android criado |
+| Rodar no navegador (opcional) | Chrome ou Edge |
 | Rodar os testes Java (opcional) | Java 17 e Maven |
 
 ---
 
-## Passo a passo (jeito mais fácil)
+## Resumo: 4 passos
+
+```
+1. Clone o repositório e entre na pasta do projeto.
+2. Configure o arquivo .env com as variáveis necessárias.
+3. Execute o backend e o servidor Java utilizando o script run-backend.
+4. Em outro terminal, entre na pasta frontend e execute o aplicativo com flutter run.
+```
+
+Cada passo está explicado a seguir.
+
+---
+
+## Passo a passo
 
 ### 1. Baixar o projeto
 
@@ -42,48 +59,61 @@ git clone https://github.com/leodionel/ES-PI4-2026-T2-G14.git
 cd ES-PI4-2026-T2-G14
 ```
 
-Ou use o GitHub Desktop e abra a pasta do projeto no terminal.
-
 ### 2. Criar o arquivo `.env`
 
 Na raiz do projeto, copie o modelo:
 
 ```
-cp .env.example .env
+cp env.example .env
 ```
 
-(no Windows PowerShell: `copy .env.example .env`)
+(no Windows PowerShell: `copy env.example .env`)
 
-Agora gere a chave secreta e cole no `.env`, no lugar de `COLE_AQUI_O_VALOR_GERADO`:
+**a) Chave secreta.** Gere uma e cole no `.env`, no lugar de `COLE_AQUI_O_VALOR_GERADO`:
 
-- **Linux, macOS ou Git Bash:**
-  ```
-  openssl rand -base64 32
-  ```
+- **Linux, macOS ou Git Bash:** `openssl rand -base64 32`
 - **Windows (PowerShell):**
   ```
   $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)
   ```
 
-O arquivo deve ficar assim (use a sua chave, não esta):
+O arquivo fica assim (use a sua chave, não esta):
 
 ```
 JWT_SECRET_BASE64=abc123...
 ```
 
-### 3. Subir banco, backend e servidor
+**b) Banco de dados.** Escolha um:
 
-Com o Docker Desktop aberto, na raiz do projeto:
+- **Banco local (padrão):** não faça nada. O Docker cria um MongoDB no seu computador. Funciona em qualquer rede, mas começa vazio: crie uma conta no app.
+- **Banco da equipe (MongoDB Atlas):** peça a linha `MONGODB_URI=...` a quem administra o Atlas e cole no `.env`. Assim todos usam as mesmas contas e dados (cada usuário do app só vê os próprios talhões). Veja a seção do Atlas mais abaixo.
+
+### 3. Subir o sistema: `./run-backend`
+
+Abra o Docker Desktop, depois, **na raiz do projeto**, em um terminal:
+
+| Sistema | Comando |
+|---|---|
+| Windows (PowerShell ou Prompt) | `./run-backend` |
+| Linux, macOS | `./run-backend.sh` |
+
+(No Windows use o PowerShell ou o Prompt de Comando, não o Git Bash.)
+
+Esse único comando sobe o banco, o backend e o servidor Java. Na primeira vez demora alguns minutos. Quando aparecer:
 
 ```
-docker compose up --build
+Servidor ativo na porta 3000
+Comandos disponiveis: status e desativar.
 ```
 
-Na primeira vez demora alguns minutos. Quando estiver pronto, tem três containers rodando: `mongo-talhao`, `backend-talhao` e `servidor-talhao`.
+está pronto. **Deixe esse terminal aberto.** Ele é o terminal do servidor Java, e você pode digitar nele:
 
-Para conferir, abra no navegador: <http://localhost:8081/status>. Se aparecer uma resposta (JSON), o backend está no ar.
+- `status`: consulta o backend e mostra a resposta;
+- `desativar`: encerra o servidor.
 
-Para parar: `Ctrl + C` no terminal, depois `docker compose down`. Os dados do banco ficam guardados e continuam na próxima vez.
+Depois de `desativar`, o banco e o backend continuam ligados. Para desligar tudo: `docker compose down` (os dados ficam guardados). Para ligar de novo, `./run-backend`.
+
+Mudou o código do backend ou do servidor? Use `./run-backend --build` para reconstruir.
 
 ### 4. Rodar o aplicativo
 
@@ -92,81 +122,104 @@ Abra um **segundo** terminal:
 ```
 cd frontend
 flutter pub get
-flutter run
 ```
 
-Antes, inicie o emulador Android (Android Studio → Device Manager). O app já vem configurado para o emulador: ele encontra o servidor em `10.0.2.2:3000`, que é como o emulador enxerga o seu computador.
+Depois escolha onde rodar:
 
-Pronto: crie uma conta no app e faça login. A conta aparece no MongoDB.
-
----
-
-## Rodar em celular de verdade
-
-O app precisa chegar na porta 3000 do computador. O jeito mais simples é por cabo USB, com a depuração USB ligada no celular:
-
-```
-adb reverse tcp:3000 tcp:3000
-flutter run --dart-define=SERVIDOR_HOST=127.0.0.1
-```
-
-Por Wi-Fi não funciona do jeito padrão, porque o Docker só abre a porta 3000 para o próprio computador.
-
-Outras opções do app (`--dart-define`):
-
-| Opção | Padrão | Para que serve |
+| Onde | Comando | Observação |
 |---|---|---|
-| `SERVIDOR_HOST` | `10.0.2.2` | Endereço do servidor de sockets |
-| `SERVIDOR_PORTA` | `3000` | Porta do servidor de sockets |
+| Emulador Android | `flutter run` | Inicie o emulador antes (Android Studio → Device Manager) |
+| Chrome | `flutter run -d chrome` | Não precisa de emulador |
+| Edge | `flutter run -d edge` | Igual ao Chrome |
 
-O app usa `dart:io`, então **não funciona no Flutter Web**.
-
----
-
-## Usar o MongoDB Atlas (em vez do banco local)
-
-1. No Atlas, crie um cluster e um usuário de banco, e libere o seu IP em *Network Access*.
-2. Copie a string de conexão (`mongodb+srv://...`) e coloque o nome do banco no final (`/talhao`).
-3. No `.env`, descomente e preencha:
-   ```
-   MONGODB_URI=mongodb+srv://USUARIO:SENHA@cluster.mongodb.net/talhao
-   ```
-4. Rode `docker compose up --build` de novo.
-
-Se a senha tiver caracteres especiais (`@`, `:`, `/`), troque por códigos de URL (por exemplo `@` vira `%40`).
+Pronto: crie uma conta no app e faça login.
 
 ---
 
-## Rodar sem Docker (para quem está mexendo no código)
+## Rodar no Chrome ou no Edge
 
-Precisa de Java 17, Maven e um MongoDB rodando (pode ser o Atlas).
+É o jeito mais rápido para desenvolver e para quem não tem emulador. Sem mudar nada no projeto:
 
-**Terminal 1 — backend** (porta 8081):
+- **É o mesmo app.** As telas, a lógica e os dados são os mesmos. O app mostra as mesmas contas, talhões e análises, porque tudo vem do mesmo servidor, backend e banco.
+- **O que muda é só o "cano" até o servidor.** O emulador e o celular falam com o servidor Java por **socket** (porta 3000). O navegador não consegue abrir socket, então usa a **porta HTTP 3001 do mesmo servidor Java**. Dali em diante o caminho é igual (servidor → backend → banco). O app escolhe sozinho, você não configura nada.
+- **O que precisa:** apenas o `./run-backend` rodando (ele já abre as portas 3000 e 3001).
+- **Diferenças que você pode notar:** o tamanho da janela muda o layout; no navegador a sessão fica guardada no próprio navegador; e a página precisa abrir em `localhost` (é o padrão do `flutter run`).
+
+---
+
+## MongoDB Atlas (banco da equipe)
+
+O app **não** acessa o Atlas direto: quem acessa é o **backend**, que roda no computador de cada pessoa. Por isso o Atlas precisa aceitar a conexão vinda do computador de quem roda o backend.
+
+Quem administra o Atlas faz uma vez:
+
+1. *Network Access* → *Add IP Address* → **Allow access from anywhere** (`0.0.0.0/0`). Assim funciona em qualquer rede, sem liberar IP por pessoa.
+2. *Database Access* → crie um usuário **só para o projeto**, com permissão de leitura e escrita apenas no banco `talhao` (não use o usuário administrador) e uma senha forte.
+3. Copie a string de conexão (`mongodb+srv://...`) e coloque o nome do banco no final (`/talhao`).
+
+Quem usa coloca no `.env`:
 
 ```
-cd backend
-mvn spring-boot:run
+MONGODB_URI=mongodb+srv://USUARIO:SENHA@cluster.mongodb.net/talhao
 ```
 
-Antes, defina as variáveis de ambiente:
+e roda `./run-backend --build`.
 
-- Linux/macOS/Git Bash: `export JWT_SECRET_BASE64=SUA_CHAVE`
-- PowerShell: `$env:JWT_SECRET_BASE64 = "SUA_CHAVE"`
+Cuidados:
 
-Sem `MONGODB_URI`, ele usa `mongodb://localhost:27017/talhao`.
+- Nunca coloque a string de conexão no GitHub. O `.env` já está no `.gitignore`. Envie para a equipe por mensagem privada.
+- Quem tem a string consegue ler o banco inteiro. As contas e os dados de cada usuário do app continuam separados dentro do app (cada um só vê o que é seu), mas isso não vale para quem acessa o banco direto.
+- As senhas dos usuários ficam guardadas com hash, não em texto.
+- Se a senha vazar, troque em *Database Access* e atualize o `.env`.
+- Se a senha tiver caracteres especiais (`@`, `:`, `/`), troque por códigos de URL (`@` vira `%40`).
 
-**Terminal 2 — servidor de sockets** (porta 3000):
+Para voltar ao banco local, apague ou comente a linha `MONGODB_URI` e rode `./run-backend --build`. Os dados do Atlas e os do banco local são separados.
+
+---
+
+## Outras formas de rodar
+
+### Servidor Java direto no seu computador (`java -cp out Servidor`)
+
+Útil para mexer no código do servidor. Precisa de Java 17. Um script faz tudo (sobe banco e backend no Docker, compila e abre o servidor no terminal):
 
 ```
+scripts\modo-b.bat         (Windows)
+./scripts/modo-b.sh        (Linux/macOS/Git Bash)
+```
+
+Ou manualmente, na raiz:
+
+```
+docker compose up -d --build --wait mongo backend
 cd servidor
 mkdir out
 javac -d out src/*.java
 java -cp out Servidor
 ```
 
-Por padrão ele procura o backend em `http://localhost:8081`. Para mudar, defina `BACKEND_URL`.
+Não rode isso junto com o `run-backend`: os dois usam a porta 3000. Variáveis opcionais do servidor: `BACKEND_URL` (padrão `http://localhost:8081`), `BIND_ADDRESS` (padrão `127.0.0.1`), `HTTP_PORT` (padrão `3001`, `0` desativa a porta do navegador).
 
-**Terminal 3 — app:** igual ao passo 4 acima.
+### Tudo em segundo plano (sem terminal do servidor)
+
+```
+docker compose --profile segundo-plano up -d --build --wait
+```
+
+Nesse caso os comandos `status` e `desativar` só funcionam com `docker attach servidor-talhao`. Para voltar ao normal, `docker compose down`.
+
+### Backend direto no seu computador
+
+Precisa de Java 17, Maven e um MongoDB (o do Docker serve).
+
+```
+docker compose up -d --wait mongo
+docker compose stop backend
+cd backend
+mvn spring-boot:run
+```
+
+Antes do `mvn`, defina a chave: Linux/macOS/Git Bash `export JWT_SECRET_BASE64=SUA_CHAVE`, PowerShell `$env:JWT_SECRET_BASE64 = "SUA_CHAVE"`. Sem `MONGODB_URI`, ele usa `mongodb://localhost:27017/talhao`. Depois rode o servidor Java no seu computador (seção acima), porque o do Docker só enxerga o backend do Docker.
 
 ---
 
@@ -187,11 +240,16 @@ Os testes do backend usam bancos e servidores falsos. Não precisam do Docker.
 | O que aparece | O que fazer |
 |---|---|
 | `Defina JWT_SECRET_BASE64 no arquivo .env` | Falta o `.env` na raiz, ou a linha `JWT_SECRET_BASE64` está vazia (passo 2) |
+| `ports are not available ... 3000`, ou `A porta 3000 já está em uso` | Há dois servidores tentando usar a porta 3000 (por exemplo `run-backend` e `java -cp out Servidor` ao mesmo tempo). Deixe só um: digite `desativar` no outro. Para ver quem usa a porta no Windows: `netstat -ano \| findstr :3000` |
+| `Falha ao encaminhar ...: HTTP/1.1 header parser received no bytes` no servidor | O backend ainda estava subindo ou a conexão com ele caiu. Rode `docker compose ps` e espere o `backend-talhao` ficar `healthy` (o `run-backend` já espera). O servidor já tenta de novo sozinho uma vez |
+| O login não funciona, ou o app não valida a conta | Confira `docker compose ps`: `backend-talhao` precisa estar `healthy`. Veja também `docker compose logs backend` |
 | "Não foi possível conectar ao servidor" no app | O Docker não está rodando, ou o `servidor-talhao` caiu. Veja `docker compose ps` e `docker compose logs servidor` |
 | Mesmo erro, mas só no celular físico | Use `adb reverse` com `SERVIDOR_HOST=127.0.0.1` (seção do celular) |
-| `port is already allocated` (3000, 8081 ou 27017) | Outro programa usa a porta. Feche-o ou pare o MongoDB instalado no computador |
-| O backend cai ao subir | Veja `docker compose logs backend`. Quase sempre é a chave JWT inválida ou a `MONGODB_URI` errada |
-| Alterei o código e nada mudou | Rode `docker compose up --build` de novo |
+| `port is already allocated` (8081 ou 27017) | Outro programa usa a porta. Feche-o ou pare o MongoDB instalado no computador |
+| O backend não fica `healthy` e o log mostra `SSLException: internal_error` ou `MongoTimeoutException` com `mongodb.net` | O Atlas está recusando a conexão: o seu IP não está liberado em *Network Access* (o IP muda com a rede). Libere-o no Atlas, ou, se o Atlas já está liberado para qualquer IP, confira usuário e senha da `MONGODB_URI`. Para testar sem Atlas, comente `MONGODB_URI` no `.env` |
+| O backend não fica `healthy` por outro motivo | Veja `docker compose logs backend`. Em geral é a chave JWT inválida ou a `MONGODB_URI` errada |
+| No Chrome/Edge: "Não foi possível conectar ao servidor" | O servidor não está no ar, ou a porta 3001 está ocupada (o servidor avisa no terminal). Confira se o `run-backend` está aberto e mostra `Servidor ativo`. Teste também <http://localhost:3001/status> |
+| Alterei o código e nada mudou | Rode `run-backend --build` |
 | Quero zerar o banco local | `docker compose down -v` (apaga os dados do MongoDB do Compose) |
 
 ---
