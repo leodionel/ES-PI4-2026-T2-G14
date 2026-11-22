@@ -27,6 +27,7 @@ Princípios do modelo:
 - Os plantios ficam dentro do documento do talhão: são poucos por talhão e sempre lidos junto com ele. As análises de solo ficam em coleção própria (`analises_solo`), ligadas ao talhão por `talhaoId`. O status do solo usa só a última análise, e o PDF e a linha do tempo leem a lista por talhão.
 - Excluir um talhão remove também as análises dele. O serviço de talhões faz essa remoção.
 - O banco guarda só o dado bruto. Status do solo, cultura atual e última análise são calculados na leitura. A cultura atual é o plantio mais recente sem `dataColheita`.
+- Só pode haver um plantio aberto por talhão. Para plantar outra cultura, a colheita anterior precisa estar registrada; senão a API responde 409. Quem lança histórico antigo deve entrar do mais antigo para o mais novo.
 - A lista `plantios` é ordenada por data pelo serviço ao ler. As análises são consultadas já ordenadas por `dataColeta`.
 - A propriedade é uma coleção própria ligada ao usuário. Cada usuário tem uma única propriedade (RN11), regra verificada no serviço. Uma propriedade só pode ser excluída se não tiver talhões; caso contrário, a API responde 409.
 - Os dados de referência (culturas, faixas de solo, regras e fontes) ficam em coleções carregadas na inicialização e mantidas em memória pelo backend.
@@ -307,7 +308,9 @@ Toda consulta de talhão filtra também por `propriedadeId`, que vem do usuário
 Criteria dono = Criteria.where("id").is(talhaoId).and("propriedadeId").is(propriedadeId);
 
 // registrar plantio
-mongo.updateFirst(Query.query(dono), new Update().push("plantios", novoPlantio), Talhao.class);
+// a consulta também exige que não exista plantio sem dataColheita ($nor + $elemMatch);
+// se nenhum documento casar, a API responde 409
+mongo.updateFirst(semPlantioAberto, new Update().push("plantios", novoPlantio), Talhao.class);
 
 // registrar colheita (somente de plantio ainda aberto)
 Query aberto = Query.query(new Criteria().andOperator(
