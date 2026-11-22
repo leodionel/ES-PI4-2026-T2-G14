@@ -323,7 +323,7 @@ public class SupervisoraDeConexao extends Thread {
 
             System.err.println(
                 "Falha ao encaminhar " + pedido.getMetodo() + " "
-                + pedido.getCaminho() + ": " + erro.getMessage()
+                + pedido.getCaminho() + ": " + Descricao.de(erro)
             );
 
             enviarErro(cliente, 502, "Nao foi possivel acessar o backend.");
