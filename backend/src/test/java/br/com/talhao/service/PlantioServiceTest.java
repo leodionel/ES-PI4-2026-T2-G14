@@ -231,4 +231,77 @@ class PlantioServiceTest {
 
         assertEquals(HttpStatus.CONFLICT, erro.getStatusCode());
     }
+
+    // TESTE 10 - Plantio novo com outro ainda aberto e recusado
+    @Test
+    void naoDeveRegistrarPlantioComOutroAberto() {
+
+        when(talhaoService.buscarEntidade("t1", "u1"))
+                .thenReturn(talhaoCom(List.of(
+                        new Plantio("pl1", "soja",
+                                LocalDate.of(2026, 3, 1), null))));
+        when(culturaService.buscar("milho")).thenReturn(milho);
+        when(culturaService.listar()).thenReturn(List.of(soja, milho));
+
+        ResponseStatusException erro = assertThrows(
+                ResponseStatusException.class,
+                () -> plantioService.registrar(
+                        "t1", "u1", "milho", LocalDate.of(2026, 11, 15)));
+
+        assertEquals(HttpStatus.CONFLICT, erro.getStatusCode());
+        assertTrue(erro.getReason().contains("Soja"));
+        verifyNoInteractions(mongoTemplate);
+    }
+
+    // TESTE 11 - Com todas as safras colhidas, o plantio novo e aceito
+    @Test
+    void deveRegistrarPlantioQuandoAsSafrasAnterioresEstaoColhidas() {
+
+        when(talhaoService.buscarEntidade("t1", "u1"))
+                .thenReturn(talhaoCom(List.of(
+                        new Plantio("pl1", "soja",
+                                LocalDate.of(2026, 3, 1),
+                                LocalDate.of(2026, 8, 15)))));
+        when(culturaService.buscar("milho")).thenReturn(milho);
+        simularAtualizacao(1);
+
+        PlantioResponse resposta = plantioService.registrar(
+                "t1", "u1", "milho", LocalDate.of(2026, 11, 15));
+
+        assertEquals("Milho", resposta.culturaNome());
+    }
+
+    // TESTE 12 - Outro pedido abriu um plantio no meio do caminho: HTTP 409
+    @Test
+    void deveRetornar409SeOutroPlantioAbriuNoMeioDoCaminho() {
+
+        when(talhaoService.buscarEntidade("t1", "u1"))
+                .thenReturn(talhaoCom(List.of()));
+        when(culturaService.buscar("soja")).thenReturn(soja);
+        simularAtualizacao(0);
+
+        ResponseStatusException erro = assertThrows(
+                ResponseStatusException.class,
+                () -> plantioService.registrar(
+                        "t1", "u1", "soja", LocalDate.of(2026, 11, 15)));
+
+        assertEquals(HttpStatus.CONFLICT, erro.getStatusCode());
+    }
+
+    // TESTE 13 - Plantio sem data nao derruba a listagem
+    @Test
+    void deveListarMesmoComPlantioSemData() {
+
+        when(talhaoService.buscarEntidade("t1", "u1"))
+                .thenReturn(talhaoCom(List.of(
+                        new Plantio("pl1", "soja", null, null),
+                        new Plantio("pl2", "milho",
+                                LocalDate.of(2026, 3, 1), null))));
+        when(culturaService.listar()).thenReturn(List.of(soja, milho));
+
+        List<PlantioResponse> lista = plantioService.listar("t1", "u1");
+
+        assertEquals(2, lista.size());
+        assertEquals("pl2", lista.get(0).plantioId());
+    }
 }
