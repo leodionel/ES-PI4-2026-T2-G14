@@ -20,36 +20,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
 
-        // Exige autenticacao nas rotas protegidas
+        // Toda rota da API exige token. Uma rota nova ja nasce protegida;
+        // so as rotas abertas abaixo ficam de fora.
         registry.addInterceptor(
                 new JwtAuthInterceptor(jwtDecoder)
         ).addPathPatterns(
-
-                // Perfil do usuario logado (cadastro e login ficam abertos)
-                "/api/usuarios/me",
-
-                // Rotas de talhoes e plantios
-                "/api/talhoes",
-                "/api/talhoes/**",
-
-                // Perfil do usuario autenticado
-                "/api/usuarios/me",
-
-                // Rotas do catalogo de culturas
-                "/api/culturas",
-                "/api/culturas/**",
-
-                // Rotas de propriedades
-                "/api/propriedades",
-                "/api/propriedades/**",
-
-                // Rotas de analises de solo
-                "/api/analises-solo",
-                "/api/analises-solo/**",
-
-                // Rotas de relatorios PDF
-                "/api/relatorios",
-                "/api/relatorios/**"
+                "/api/**"
+        ).excludePathPatterns(
+                // Entrar e criar conta nao tem token ainda
+                "/api/usuarios/cadastro",
+                "/api/usuarios/login"
         );
     }
 }
