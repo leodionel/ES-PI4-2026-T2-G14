@@ -128,8 +128,9 @@ class UsuarioServiceTest {
 
         assertEquals(HttpStatus.UNAUTHORIZED, erro.getStatusCode());
 
-        // Nao verifica a senha se o usuario nao existir
-        verifyNoInteractions(passwordEncoder);
+        // Confere um hash mesmo assim, para a resposta demorar o mesmo
+        // tempo de uma senha errada e nao revelar quais e-mails existem
+        verify(passwordEncoder).matches(eq("Senha123"), any());
     }
 
     // TESTE 4 - Cadastro realizado com sucesso
@@ -211,5 +212,25 @@ class UsuarioServiceTest {
 
         // Nao gera hash se o email ja estiver cadastrado
         verifyNoInteractions(passwordEncoder);
+    }
+
+    // TESTE 6 - Nome com espacos nas pontas conta so as letras
+    @Test
+    void deveRecusarNomeCurtoDepoisDeRemoverEspacos() {
+
+        CadastroUsuarioRequest dados = new CadastroUsuarioRequest(
+                "  ab ",
+                "ab@email.com",
+                "19999999999",
+                "Senha123"
+        );
+
+        ResponseStatusException erro = assertThrows(
+                ResponseStatusException.class,
+                () -> usuarioService.cadastrar(dados)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, erro.getStatusCode());
+        verifyNoInteractions(usuarioRepository);
     }
 }

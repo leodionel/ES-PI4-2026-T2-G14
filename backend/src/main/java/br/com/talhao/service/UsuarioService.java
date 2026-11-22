@@ -4,6 +4,8 @@ package br.com.talhao.service;
 import java.time.Instant;
 import java.util.Locale;
 
+import jakarta.annotation.PostConstruct;
+
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,8 +22,14 @@ import br.com.talhao.repository.UsuarioRepository;
 @Service
 public class UsuarioService {
 
+    private static final int NOME_MINIMO = 3;
+
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
+
+    // Hash de uma senha qualquer, usado so para gastar o mesmo tempo de
+    // uma verificacao real quando o e-mail nao existe
+    private String hashFalso;
 
     // Recebe as dependencias pelo construtor
     public UsuarioService(
@@ -32,8 +40,25 @@ public class UsuarioService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    // Calculado uma vez na subida, com o mesmo custo do BCrypt das senhas
+    @PostConstruct
+    void prepararHashFalso() {
+        this.hashFalso = passwordEncoder.encode("senha-que-ninguem-usa");
+    }
+
     // Realiza o cadastro de um novo usuario
     public UsuarioResponse cadastrar(CadastroUsuarioRequest dados) {
+
+        // A validacao do DTO conta os espacos das pontas; aqui conta so o nome
+        String nome = dados.nome().trim();
+
+        if (nome.length() < NOME_MINIMO) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "O nome deve ter pelo menos " + NOME_MINIMO
+                            + " caracteres"
+            );
+        }
 
         // Remove espacos e padroniza o email em minusculo
         String email = dados.email()
@@ -54,7 +79,7 @@ public class UsuarioService {
         // Cria o usuario com os dados recebidos
         Usuario usuario = new Usuario(
                 null,
-                dados.nome().trim(),
+                nome,
                 email,
                 dados.telefone(),
                 senhaHash,
@@ -94,13 +119,19 @@ public class UsuarioService {
                 .toLowerCase(Locale.ROOT);
 
         // Busca o usuario no MongoDB pelo email
-        Usuario usuario = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED,
-                        "E-mail ou senha inválidos"
-                ));
+        Usuario usuario = usuarioRepository.findByEmail(email).orElse(null);
 
-        // Compara a senha digitada com o hash salvo no banco
+        // E-mail inexistente tambem confere um hash: sem isso a resposta
+        // seria bem mais rapida e mostraria quais e-mails tem conta
+        if (usuario == null) {
+            passwordEncoder.matches(dados.senha(), hashFalso);
+
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "E-mail ou senha inválidos"
+            );
+        }
+
         boolean senhaCorreta = passwordEncoder.matches(
                 dados.senha(),
                 usuario.senhaHash()
@@ -115,23 +146,6 @@ public class UsuarioService {
         }
 
         // Retorna os dados do usuario sem expor a senha
-        return new UsuarioResponse(
-                usuario.id(),
-                usuario.nome(),
-                usuario.email(),
-                usuario.telefone(),
-                usuario.criadoEm()
-        );
-    }
-
-    // Retorna os dados do perfil do usuario autenticado, sem expor o hash da senha.
-    public UsuarioResponse buscarPorId(String usuarioId) {
-        Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Usuario nao encontrado"
-                ));
-
         return new UsuarioResponse(
                 usuario.id(),
                 usuario.nome(),
