@@ -6,5 +6,5 @@ RUN mkdir out && javac -d out src/*.java
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 COPY --from=build /app/out .
-EXPOSE 3000
+EXPOSE 3000 3001
 CMD ["java", "Servidor"]
