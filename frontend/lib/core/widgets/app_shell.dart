@@ -108,17 +108,17 @@ class _AppShellState extends State<AppShell> {
           appBar: AppBar(title: Text(_secao.titulo)),
           drawer: Drawer(
             backgroundColor: AppColors.painel,
-            child: _Menu(
+            child: Builder(builder: (drawerContext) => _Menu(
               secao: _secao,
               aoIr: (secao) {
-                Navigator.of(context).pop();
+                Scaffold.of(drawerContext).closeDrawer();
                 _ir(secao);
               },
               aoSair: () {
-                Navigator.of(context).pop();
+                Scaffold.of(drawerContext).closeDrawer();
                 _sair();
               },
-            ),
+            )),
           ),
           body: _pagina(),
         );
