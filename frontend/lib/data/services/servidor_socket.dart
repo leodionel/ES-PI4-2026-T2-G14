@@ -86,15 +86,17 @@ class ServidorSocket implements ServidorTransporte {
     await for (final pedaco in socket) {
       recebido.add(pedaco);
 
-      var dados = recebido.toBytes();
+      final todos = recebido.toBytes();
 
+      if (todos.length < cabecalhoJava.length) {
+        continue;
+      }
+
+      // O cabeçalho só precisa ser conferido uma vez, mas precisa ser
+      // descartado a cada leitura: a resposta pode chegar em vários pedaços.
       if (!cabecalhoLido) {
-        if (dados.length < cabecalhoJava.length) {
-          continue;
-        }
-
         for (var i = 0; i < cabecalhoJava.length; i++) {
-          if (dados[i] != cabecalhoJava[i]) {
+          if (todos[i] != cabecalhoJava[i]) {
             throw const FormatoInvalidoException(
               'O servidor não respondeu no formato esperado.',
             );
@@ -102,10 +104,11 @@ class ServidorSocket implements ServidorTransporte {
         }
 
         cabecalhoLido = true;
-        dados = Uint8List.sublistView(dados, cabecalhoJava.length);
       }
 
-      final resposta = SerializacaoJava.lerResposta(dados);
+      final resposta = SerializacaoJava.lerResposta(
+        Uint8List.sublistView(todos, cabecalhoJava.length),
+      );
 
       if (resposta != null) {
         return resposta;
