@@ -54,6 +54,16 @@ public class PlantioService {
         // A cultura precisa existir no catalogo
         Cultura cultura = culturaService.buscar(culturaId);
 
+        // Uma safra por vez: o plantio anterior precisa ter a colheita
+        // registrada antes de plantar outra cultura
+        talhao.plantios()
+                .stream()
+                .filter(p -> p.dataColheita() == null)
+                .findFirst()
+                .ifPresent(aberto -> {
+                    throw plantioAberto(aberto);
+                });
+
         Plantio plantio = new Plantio(
                 new ObjectId().toHexString(),
                 cultura.id(),
@@ -61,12 +71,22 @@ public class PlantioService {
                 null
         );
 
-        // Acrescenta o plantio sem regravar o documento inteiro
-        mongoTemplate.updateFirst(
-                consultaDoTalhao(talhao),
+        // A condicao tambem vai na consulta: se outro pedido abrir um plantio
+        // entre a leitura e a gravacao, nenhum documento e atualizado.
+        // Acrescenta o plantio sem regravar o documento inteiro.
+        UpdateResult resultado = mongoTemplate.updateFirst(
+                consultaSemPlantioAberto(talhao),
                 new Update().push("plantios", plantio),
                 Talhao.class
         );
+
+        if (resultado.getMatchedCount() == 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Ja existe um plantio sem colheita neste talhao. "
+                    + "Registre a colheita antes de plantar outra cultura"
+            );
+        }
 
         return paraResponse(plantio, cultura.nome());
     }
@@ -85,7 +105,10 @@ public class PlantioService {
 
         return talhao.plantios()
                 .stream()
-                .sorted(Comparator.comparing(Plantio::dataPlantio))
+                .sorted(Comparator.comparing(
+                        Plantio::dataPlantio,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ))
                 .map(p -> paraResponse(
                         p,
                         nomes.getOrDefault(p.culturaId(), p.culturaId())
@@ -172,8 +195,31 @@ public class PlantioService {
                 .and("propriedadeId").is(talhao.propriedadeId());
     }
 
-    private Query consultaDoTalhao(Talhao talhao) {
-        return Query.query(criterioDoTalhao(talhao));
+    // Talhao do usuario e sem nenhum plantio em aberto (sem dataColheita)
+    private Query consultaSemPlantioAberto(Talhao talhao) {
+        return new Query(new Criteria().andOperator(
+                criterioDoTalhao(talhao),
+                new Criteria().norOperator(
+                        Criteria.where("plantios").elemMatch(
+                                Criteria.where("dataColheita").is(null)
+                        )
+                )
+        ));
+    }
+
+    private ResponseStatusException plantioAberto(Plantio aberto) {
+
+        String nome = culturaService.listar().stream()
+                .filter(c -> c.id().equals(aberto.culturaId()))
+                .map(Cultura::nome)
+                .findFirst()
+                .orElse(aberto.culturaId());
+
+        return new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "A safra de " + nome + " ainda esta aberta. "
+                + "Registre a colheita antes de plantar outra cultura"
+        );
     }
 
     private PlantioResponse paraResponse(Plantio plantio, String culturaNome) {
