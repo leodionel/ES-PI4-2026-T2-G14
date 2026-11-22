@@ -79,6 +79,9 @@ class RotasDaApiTest {
     @MockitoBean
     private UsuarioService usuarioService;
 
+    @MockitoBean
+    private br.com.talhao.service.RecuperacaoSenhaService recuperacaoSenhaService;
+
     // TESTE 1 - O contexto sobe com todos os controllers (sem rota repetida)
     @Test
     void deveCarregarTodosOsControllersSemRotaRepetida() throws Exception {
@@ -123,7 +126,9 @@ class RotasDaApiTest {
     @ParameterizedTest
     @CsvSource({
             "/api/usuarios/cadastro",
-            "/api/usuarios/login"
+            "/api/usuarios/login",
+            "/api/usuarios/recuperacao-senha",
+            "/api/usuarios/redefinir-senha"
     })
     void devemFicarAbertasAsRotasDeCadastroELogin(String caminho)
             throws Exception {

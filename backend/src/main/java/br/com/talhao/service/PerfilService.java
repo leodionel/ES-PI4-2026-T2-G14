@@ -57,16 +57,8 @@ public class PerfilService {
             );
         }
 
-        Usuario atualizado = new Usuario(
-                atual.id(),
-                nome,
-                atual.email(),
-                dados.telefone(),
-                atual.senhaHash(),
-                atual.criadoEm()
-        );
-
-        return montarPerfil(usuarioRepository.save(atualizado));
+        usuarioRepository.atualizarDadosPessoais(atual.id(), nome, dados.telefone());
+        return montarPerfil(buscarUsuario(usuarioId));
     }
 
     // Busca o usuario do token. Se ele nao existe mais,

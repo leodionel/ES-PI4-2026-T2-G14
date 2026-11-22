@@ -19,6 +19,13 @@ services:
     container_name: backend-talhao
     environment:
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/talhao}
+      SPRING_MAIL_HOST: ${SMTP_HOST:-}
+      SPRING_MAIL_PORT: ${SMTP_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SMTP_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SMTP_PASSWORD:-}
+      APP_RECUPERACAO_REMETENTE: ${SMTP_FROM:-}
+      SMTP_AUTH: ${SMTP_AUTH:-true}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
       JWT_SECRET_BASE64: "${JWT_SECRET_BASE64:?Defina JWT_SECRET_BASE64 no arquivo .env (gere com openssl rand -base64 32)}"
       CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
     ports:

@@ -7,7 +7,6 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -111,9 +110,8 @@ class PerfilServiceTest {
     void deveAtualizarNomeETelefonePreservandoOsDemaisCampos() {
 
         when(usuarioRepository.findById("u1"))
-                .thenReturn(Optional.of(criarUsuario()));
-        when(usuarioRepository.save(any(Usuario.class)))
-                .thenAnswer(chamada -> chamada.getArgument(0));
+                .thenReturn(Optional.of(criarUsuario()), Optional.of(new Usuario(
+                        "u1", "Maria Souza", "maria@email.com", "1933334444", "hash", CRIADO_EM)));
         when(propriedadeRepository.findByUsuarioId("u1"))
                 .thenReturn(List.of());
 
@@ -122,17 +120,7 @@ class PerfilServiceTest {
                 new AtualizacaoPerfilRequest("Maria Souza", "1933334444")
         );
 
-        ArgumentCaptor<Usuario> captor =
-                ArgumentCaptor.forClass(Usuario.class);
-        verify(usuarioRepository).save(captor.capture());
-
-        Usuario salvo = captor.getValue();
-        assertEquals("u1", salvo.id());
-        assertEquals("Maria Souza", salvo.nome());
-        assertEquals("1933334444", salvo.telefone());
-        assertEquals("maria@email.com", salvo.email());
-        assertEquals("hash-secreto", salvo.senhaHash());
-        assertEquals(CRIADO_EM, salvo.criadoEm());
+        verify(usuarioRepository).atualizarDadosPessoais("u1", "Maria Souza", "1933334444");
 
         assertEquals("Maria Souza", perfil.usuario().nome());
         assertEquals("1933334444", perfil.usuario().telefone());
@@ -144,8 +132,6 @@ class PerfilServiceTest {
 
         when(usuarioRepository.findById("u1"))
                 .thenReturn(Optional.of(criarUsuario()));
-        when(usuarioRepository.save(any(Usuario.class)))
-                .thenAnswer(chamada -> chamada.getArgument(0));
         when(propriedadeRepository.findByUsuarioId("u1"))
                 .thenReturn(List.of());
 
@@ -154,11 +140,7 @@ class PerfilServiceTest {
                 new AtualizacaoPerfilRequest("  Maria Souza  ", "19999999999")
         );
 
-        ArgumentCaptor<Usuario> captor =
-                ArgumentCaptor.forClass(Usuario.class);
-        verify(usuarioRepository).save(captor.capture());
-
-        assertEquals("Maria Souza", captor.getValue().nome());
+        verify(usuarioRepository).atualizarDadosPessoais("u1", "Maria Souza", "19999999999");
     }
 
     // TESTE 6 - Nome curto demais depois de remover os espacos

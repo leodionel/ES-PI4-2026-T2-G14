@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import '../core/app_exception.dart';
 
 import '../core/app_textos.dart';
 import '../core/theme/app_colors.dart';
@@ -10,12 +12,14 @@ import '../core/utils/validators.dart';
 class RecuperacaoSenha extends StatefulWidget {
   const RecuperacaoSenha({
     super.key,
-    this.aoSolicitarRecuperacao,
+    required this.aoSolicitarRecuperacao,
+    required this.aoRedefinir,
     this.aoVoltar,
   });
 
-  // A ação real será fornecida pela integração com o backend.
-  final Future<void> Function(String email)? aoSolicitarRecuperacao;
+  final Future<void> Function(String email) aoSolicitarRecuperacao;
+  final Future<void> Function(String email, String codigo, String senha)
+  aoRedefinir;
   final VoidCallback? aoVoltar;
 
   @override
@@ -25,13 +29,16 @@ class RecuperacaoSenha extends StatefulWidget {
 class _RecuperacaoSenhaState extends State<RecuperacaoSenha> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+  final _codigo = TextEditingController();
+  final _senha = TextEditingController();
+  bool _usarCodigo = false;
 
   bool _carregando = false;
   bool _concluido = false;
   String? _erro;
 
   // Valida o e-mail e solicita a recuperação.
-  Future<void> _enviarLink() async {
+  Future<void> _enviar() async {
     if (_carregando || _concluido) return;
 
     if (!(_formKey.currentState?.validate() ?? false)) {
@@ -42,37 +49,36 @@ class _RecuperacaoSenhaState extends State<RecuperacaoSenha> {
       _erro = null;
     });
 
-    final solicitar = widget.aoSolicitarRecuperacao;
-
-    // Não informa envio realizado sem integração real.
-    if (solicitar == null) {
-      setState(() {
-        _erro =
-            'A recuperação de senha ainda não está '
-            'conectada ao servidor.';
-      });
-      return;
-    }
-
     setState(() {
       _carregando = true;
     });
 
     try {
-      await solicitar(_emailController.text.trim());
+      final email = _emailController.text.trim();
+      if (_usarCodigo) {
+        await widget.aoRedefinir(email, _codigo.text.trim(), _senha.text);
+      } else {
+        await widget.aoSolicitarRecuperacao(email);
+      }
 
       if (!mounted) return;
 
       setState(() {
-        _concluido = true;
+        if (_usarCodigo) {
+          _concluido = true;
+          _senha.clear();
+          _codigo.clear();
+        } else {
+          _usarCodigo = true;
+        }
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
 
       setState(() {
-        _erro =
-            'Não foi possível solicitar a recuperação. '
-            'Tente novamente.';
+        _erro = e is AppException
+            ? e.mensagem
+            : 'Não foi possível concluir. Tente novamente.';
       });
     } finally {
       if (mounted) {
@@ -98,6 +104,8 @@ class _RecuperacaoSenhaState extends State<RecuperacaoSenha> {
   @override
   void dispose() {
     _emailController.dispose();
+    _codigo.dispose();
+    _senha.dispose();
     super.dispose();
   }
 
@@ -159,8 +167,10 @@ class _RecuperacaoSenhaState extends State<RecuperacaoSenha> {
                           const SizedBox(height: 8),
 
                           Text(
-                            'Digite seu e-mail cadastrado '
-                            'para solicitar a recuperação de senha.',
+                            _usarCodigo
+                                ? 'Use o código enviado ao seu e-mail. Ele vale por 15 minutos.'
+                                : 'Digite seu e-mail cadastrado '
+                                      'para solicitar a recuperação de senha.',
                             style: textos.bodySmall,
                           ),
 
@@ -177,11 +187,40 @@ class _RecuperacaoSenhaState extends State<RecuperacaoSenha> {
                             enabled: !_carregando && !_concluido,
                             autofillHints: const [AutofillHints.email],
                             onFieldSubmitted: (_) {
-                              _enviarLink();
+                              if (!_usarCodigo) _enviar();
                             },
                           ),
 
                           const SizedBox(height: 20),
+
+                          if (_usarCodigo && !_concluido) ...[
+                            AppTextField(
+                              controller: _codigo,
+                              rotulo: 'Código recebido',
+                              enabled: !_carregando,
+                              validator: (v) =>
+                                  RegExp(
+                                    r'^[A-Za-z0-9_-]{32}$',
+                                  ).hasMatch(v?.trim() ?? '')
+                                  ? null
+                                  : 'Cole o código completo enviado por e-mail.',
+                            ),
+                            const SizedBox(height: 16),
+                            AppTextField(
+                              controller: _senha,
+                              rotulo: 'Nova senha',
+                              senha: true,
+                              enabled: !_carregando,
+                              validator: (v) =>
+                                  v == null ||
+                                      v.trim().isEmpty ||
+                                      v.length < 8 ||
+                                      utf8.encode(v).length > 72
+                                  ? 'Use pelo menos 8 caracteres e no máximo 72 bytes.'
+                                  : null,
+                            ),
+                            const SizedBox(height: 16),
+                          ],
 
                           // Mensagem de erro.
                           if (_erro != null) ...[
@@ -216,10 +255,7 @@ class _RecuperacaoSenhaState extends State<RecuperacaoSenha> {
                                   SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      'Solicitação recebida. '
-                                      'Se houver uma conta para '
-                                      'este e-mail, siga as '
-                                      'instruções enviadas.',
+                                      'Senha alterada. Entre com a nova senha.',
                                     ),
                                   ),
                                 ],
@@ -229,12 +265,29 @@ class _RecuperacaoSenhaState extends State<RecuperacaoSenha> {
                           ],
 
                           // Botão com estado de carregamento.
-                          AppButton(
-                            texto: 'Enviar link de recuperação',
-                            textoCarregando: 'Enviando...',
-                            carregando: _carregando,
-                            onPressed: _concluido ? null : _enviarLink,
-                          ),
+                          if (!_concluido)
+                            AppButton(
+                              texto: _usarCodigo
+                                  ? 'Alterar senha'
+                                  : 'Enviar código',
+                              textoCarregando: 'Enviando...',
+                              carregando: _carregando,
+                              onPressed: _enviar,
+                            ),
+                          if (!_concluido)
+                            TextButton(
+                              onPressed: _carregando
+                                  ? null
+                                  : () => setState(() {
+                                      _usarCodigo = !_usarCodigo;
+                                      _erro = null;
+                                    }),
+                              child: Text(
+                                _usarCodigo
+                                    ? 'Solicitar outro código'
+                                    : 'Já tenho um código',
+                              ),
+                            ),
 
                           const SizedBox(height: 32),
 

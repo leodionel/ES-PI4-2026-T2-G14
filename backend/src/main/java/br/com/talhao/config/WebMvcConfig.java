@@ -29,7 +29,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
         ).excludePathPatterns(
                 // Entrar e criar conta nao tem token ainda
                 "/api/usuarios/cadastro",
-                "/api/usuarios/login"
+                "/api/usuarios/login",
+                "/api/usuarios/recuperacao-senha",
+                "/api/usuarios/redefinir-senha"
         );
     }
 }

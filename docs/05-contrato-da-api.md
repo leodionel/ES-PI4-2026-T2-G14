@@ -4,6 +4,13 @@ Documento vivo: cada módulo novo do backend entra aqui. Todas as rotas abaixo p
 
 Erros seguem o formato do Spring (`ProblemDetail`): `title`, `status`, `detail`. Erros de validação trazem também `campos`, com a mensagem de cada campo.
 
+## Recuperação de senha (RF03)
+
+As duas rotas são públicas. Para habilitar o envio pelo Docker Compose, preencha os campos SMTP de `env.example` no `.env` e execute `docker compose up -d --build backend`. Use o endereço de remetente autorizado pelo seu provedor.
+
+- `POST /api/usuarios/recuperacao-senha` recebe `{"email":"produtor@example.org"}`. Retorna 202 para e-mails conhecidos ou desconhecidos. Um código vale por 15 minutos e pode ser reenviado após 60 segundos. O reenvio substitui o código anterior.
+- `POST /api/usuarios/redefinir-senha` recebe os campos `email`, `codigo` e `novaSenha`. Retorna 204 após a alteração ou 400 se o código estiver incorreto, vencido ou já utilizado. A senha deve ter pelo menos oito caracteres e no máximo 72 bytes em UTF-8.
+
 ## Perfil (RF04, RF05)
 
 O usuário vem sempre do token, nunca da URL: cada produtor só vê e altera o próprio perfil (RN06).

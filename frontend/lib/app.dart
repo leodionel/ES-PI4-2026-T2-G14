@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'core/theme/app_theme.dart';
 import 'data/repositories/auth_repository.dart';
+import 'data/services/api_client.dart';
 import 'telas/cadastro_screen.dart';
 import 'core/widgets/app_shell.dart';
 import 'telas/login.dart';
@@ -66,8 +67,19 @@ class App extends StatelessWidget {
             aoRecuperarSenha: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) =>
-                      const RecuperacaoSenha(),
+                  builder: (_) => RecuperacaoSenha(
+                    aoSolicitarRecuperacao: (email) async {
+                      await context.read<ApiClient>().post(
+                        '/api/usuarios/recuperacao-senha', {'email': email},
+                      );
+                    },
+                    aoRedefinir: (email, codigo, senha) async {
+                      await context.read<ApiClient>().post(
+                        '/api/usuarios/redefinir-senha',
+                        {'email': email, 'codigo': codigo, 'novaSenha': senha},
+                      );
+                    },
+                  ),
                 ),
               );
             },

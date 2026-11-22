@@ -4,6 +4,8 @@ package br.com.talhao.repository;
 import java.util.Optional;
 
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
+import org.springframework.data.mongodb.repository.Update;
 
 import br.com.talhao.model.Usuario;
 
@@ -17,5 +19,9 @@ public interface UsuarioRepository
 
     //Verifica se já existe um usuário com esse email
     boolean existsByEmail(String email);
+
+    @Query("{ '_id': ?0 }")
+    @Update("{ '$set': { 'nome': ?1, 'telefone': ?2 } }")
+    void atualizarDadosPessoais(String id, String nome, String telefone);
 
 }
