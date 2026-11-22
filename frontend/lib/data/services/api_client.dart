@@ -1,22 +1,24 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import '../../core/app_exception.dart';
+import 'criar_transporte.dart';
 import 'serializacao_java.dart';
-import 'servidor_socket.dart';
+import 'servidor_transporte.dart';
 
 // Responsável pela comunicação com o backend.
 //
-// O aplicativo não fala HTTP com a API: cada chamada vai por sockets ao
-// servidor Java, que encaminha a requisição ao Spring Boot e devolve a
-// resposta. A interface (get, post, put, delete) é a mesma de uma API HTTP.
+// O aplicativo não chama a API direto: cada chamada vai ao servidor Java,
+// que encaminha a requisição ao Spring Boot e devolve a resposta. No celular
+// e no emulador a conversa é por sockets; no navegador (Flutter Web), por
+// HTTP na porta 3001 do mesmo servidor. A interface (get, post, put, delete)
+// é a mesma de uma API HTTP.
 class ApiClient {
-  ApiClient({ServidorSocket? servidor})
-    : _servidor = servidor ?? ServidorSocket();
+  ApiClient({ServidorTransporte? servidor})
+    : _servidor = servidor ?? criarTransporte();
 
-  final ServidorSocket _servidor;
+  final ServidorTransporte _servidor;
 
   // Busca dados do backend.
   Future<dynamic> get(String caminho, {String? token}) {
@@ -92,7 +94,7 @@ class ApiClient {
         tipo: TipoErro.rede,
         mensagem: 'O servidor demorou para responder. Tente novamente.',
       );
-    } on SocketException {
+    } on ConexaoFalhouException {
       throw const AppException(
         tipo: TipoErro.rede,
         mensagem:
