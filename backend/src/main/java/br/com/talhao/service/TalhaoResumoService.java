@@ -1,3 +1,4 @@
+
 package br.com.talhao.service;
 
 import java.time.LocalDate;
@@ -10,6 +11,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 import br.com.talhao.dto.CulturaAtualResponse;
+import br.com.talhao.dto.StatusSoloResponse;
 import br.com.talhao.dto.TalhaoResumoResponse;
 import br.com.talhao.model.Cultura;
 import br.com.talhao.model.Plantio;
@@ -19,8 +21,8 @@ import br.com.talhao.repository.AnaliseSoloRepository;
 import br.com.talhao.repository.PropriedadeRepository;
 import br.com.talhao.repository.TalhaoRepository;
 
-// Monta a lista de talhoes com cultura atual e status do solo (RF07).
-// O status vem do StatusSoloService, a unica fonte dessa regra.
+// Monta a lista de talhoes com dados completos (RF07).
+// O status vem do StatusSoloService.
 @Service
 public class TalhaoResumoService {
 
@@ -44,16 +46,15 @@ public class TalhaoResumoService {
         this.culturaService = culturaService;
     }
 
-    // Lista os talhoes da propriedade do usuario
+    // Lista os talhoes da propriedade do usuario.
     public List<TalhaoResumoResponse> listar(String usuarioId) {
 
-        // No MVP cada usuario tem no maximo uma propriedade (RN11)
+        // No MVP, cada usuario tem no maximo uma propriedade.
         Optional<Propriedade> propriedade = propriedadeRepository
                 .findByUsuarioId(usuarioId)
                 .stream()
                 .findFirst();
 
-        // Sem propriedade, nao ha talhoes
         if (propriedade.isEmpty()) {
             return List.of();
         }
@@ -61,14 +62,23 @@ public class TalhaoResumoService {
         List<Talhao> talhoes = talhaoRepository
                 .findByPropriedadeId(propriedade.get().id());
 
-        // O catalogo e lido uma vez para todos os talhoes
-        Map<String, Cultura> catalogo = culturaService.listar().stream()
-                .collect(Collectors.toMap(Cultura::id, Function.identity()));
+        // Carrega o catalogo de culturas uma unica vez.
+        Map<String, Cultura> catalogo = culturaService
+                .listar()
+                .stream()
+                .collect(Collectors.toMap(
+                        Cultura::id,
+                        Function.identity()
+                ));
 
         LocalDate hoje = LocalDate.now();
 
         return talhoes.stream()
-                .map(talhao -> paraResumo(talhao, catalogo, hoje))
+                .map(talhao -> paraResumo(
+                        talhao,
+                        catalogo,
+                        hoje
+                ))
                 .toList();
     }
 
@@ -77,10 +87,18 @@ public class TalhaoResumoService {
             Map<String, Cultura> catalogo,
             LocalDate hoje) {
 
+        // O backend determina qual plantio esta em andamento.
         CulturaAtualResponse culturaAtual = HistoricoTalhao
                 .plantioAtual(talhao, catalogo, hoje)
-                .map(plantio -> paraCulturaAtual(plantio, catalogo))
+                .map(plantio -> paraCulturaAtual(
+                        plantio,
+                        catalogo
+                ))
                 .orElse(null);
+
+        // Calcula o status apenas uma vez e reutiliza os dados.
+        StatusSoloResponse statusSolo =
+                statusSoloService.calcular(talhao, catalogo);
 
         return new TalhaoResumoResponse(
                 talhao.id(),
@@ -88,9 +106,13 @@ public class TalhaoResumoService {
                 talhao.areaHa(),
                 talhao.criadoEm(),
                 talhao.plantios().size(),
-                (int) analiseSoloRepository.countByTalhaoId(talhao.id()),
+                (int) analiseSoloRepository.countByTalhaoId(
+                        talhao.id()
+                ),
                 culturaAtual,
-                statusSoloService.calcular(talhao, catalogo).status()
+                statusSolo.status(),
+                statusSolo.dataAnalise(),
+                statusSolo.motivos()
         );
     }
 
