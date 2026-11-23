@@ -1,3 +1,5 @@
+// Feito por Leonardo Dionel RA:25010092
+
 package br.com.talhao.repository;
 
 import org.springframework.data.mongodb.repository.MongoRepository;

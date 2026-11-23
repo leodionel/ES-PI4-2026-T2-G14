@@ -1,3 +1,5 @@
+// Feito por Leonardo Dionel RA:25010092
+
 package br.com.talhao.dto;
 
 // Dados da tela de perfil: o usuario e a propriedade dele.

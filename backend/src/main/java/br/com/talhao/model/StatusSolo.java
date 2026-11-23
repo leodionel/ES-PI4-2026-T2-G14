@@ -1,3 +1,5 @@
+// Feito por Leonardo Dionel RA:25010092
+
 package br.com.talhao.model;
 
 // Status do solo de um talhao, calculado a partir da ultima analise
