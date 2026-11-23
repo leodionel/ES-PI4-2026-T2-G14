@@ -1,3 +1,6 @@
+// Contribuição: Matheus Rosini
+// RA: 25015832
+
 import java.io.Serializable;
 
 // Base das mensagens trocadas entre cliente e servidor

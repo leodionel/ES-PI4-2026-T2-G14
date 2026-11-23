@@ -1,4 +1,7 @@
 // Contribuição de Matheus Azevedo Teixeira RA: 25014927
+// Contribuição: Matheus Rosini
+// RA: 25015832
+
 
 package br.com.talhao.config;
 

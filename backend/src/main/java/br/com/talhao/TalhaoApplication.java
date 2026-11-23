@@ -1,3 +1,6 @@
+// Contribuição: Matheus Rosini
+// RA: 25015832
+// Participação: configuração inicial da aplicação Spring Boot.
 
 package br.com.talhao;
 

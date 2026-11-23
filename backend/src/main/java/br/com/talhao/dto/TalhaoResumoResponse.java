@@ -1,28 +1,26 @@
+// Contribuição: Matheus Rosini
+// RA: 25015832
+
+
 package br.com.talhao.dto;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
 
 import br.com.talhao.model.StatusSolo;
 
-// Item da lista de talhoes (RF07).
-// Tem os mesmos campos de TalhaoResponse mais a cultura atual e o status.
+// Resumo completo do talhao para lista e dashboard (RF07).
+// As regras agronomicas sao calculadas no backend.
 public record TalhaoResumoResponse(
-
     String id,
     String nome,
     double areaHa,
     Instant criadoEm,
-
-    // Quantidade de safras registradas no talhao
     int totalPlantios,
-
-    // Quantidade de analises de solo registradas no talhao
     int totalAnalises,
-
-    // Nulo quando o talhao nao tem cultura plantada
     CulturaAtualResponse culturaAtual,
-
-    // Status do solo pela ultima analise
-    StatusSolo statusSolo
-
+    StatusSolo statusSolo,
+    LocalDate dataAnalise,
+    List<String> motivos
 ) {}
