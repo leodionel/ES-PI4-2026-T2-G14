@@ -23,5 +23,25 @@ class AuthRepositoryIndisponivel extends AuthRepository {
   }
 
   @override
+  Future<String?> solicitarRecuperacao(String email) async {
+    throw const AppException(
+      tipo: TipoErro.desconhecido,
+      mensagem: 'A recuperação de senha ainda não está conectada ao servidor.',
+    );
+  }
+
+  @override
+  Future<void> redefinirSenha({
+    required String email,
+    required String codigo,
+    required String novaSenha,
+  }) async {
+    throw const AppException(
+      tipo: TipoErro.desconhecido,
+      mensagem: 'A recuperação de senha ainda não está conectada ao servidor.',
+    );
+  }
+
+  @override
   Future<void> sair() async {}
 }

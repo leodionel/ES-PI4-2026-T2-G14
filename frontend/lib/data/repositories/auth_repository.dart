@@ -16,6 +16,18 @@ abstract class AuthRepository extends ChangeNotifier {
   //Solicita a autentiucacao com email e senha
   Future<void> entrar(String email, String senha);
 
+  // Pede o codigo de recuperacao de senha (RF03).
+  // Devolve o codigo simulado quando o backend o exibe, ou null quando nao
+  // (RECUPERACAO_EXIBIR_CODIGO=false: o codigo fica so nos logs do backend).
+  Future<String?> solicitarRecuperacao(String email);
+
+  // Troca a senha usando o codigo recebido (RF03).
+  Future<void> redefinirSenha({
+    required String email,
+    required String codigo,
+    required String novaSenha,
+  });
+
   //Encerra a sessao
   Future<void> sair();
 }
