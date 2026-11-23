@@ -1,9 +1,3 @@
-// Feito por Leonardo Dionel RA:25010092
-
-// Contribuição: Matheus Rosini
-// RA: 25015832
-// Participação: configuração inicial da aplicação Spring Boot.
-
 package br.com.talhao;
 
 import java.util.TimeZone;
@@ -16,11 +10,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class TalhaoApplication {
 
     public static void main(String[] args) {
+
+        // Mantém as datas sem hora iguais em todos os ambientes
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
-        
-        // Inicializa a aplicação Spring Boot
+
+        // Inicializa a aplicação Spring Boot (uma única vez)
         SpringApplication.run(TalhaoApplication.class, args);
-        
-        
     }
 }

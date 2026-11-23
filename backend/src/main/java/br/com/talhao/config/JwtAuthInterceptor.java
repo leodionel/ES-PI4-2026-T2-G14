@@ -1,6 +1,4 @@
-// Contribuição: Matheus Rosini
-// RA: 25015832
-
+// Contribuição: Matheus Rosini RA: 25015832
 
 package br.com.talhao.config;
 
@@ -27,8 +25,8 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             HttpServletResponse response,
             Object handler) throws Exception {
 
-        // Permite requisicoes OPTIONS (preflight CORS)
-        // sem exigir um token JWT
+        // O preflight do CORS (OPTIONS) nao envia o cabecalho
+        // Authorization; ele precisa passar para o CORS responder
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             return true;
         }

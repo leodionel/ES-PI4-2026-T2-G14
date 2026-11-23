@@ -1,7 +1,7 @@
-﻿// Feito por Leonardo Dionel RA:25010092
+// Feito por Leonardo Dionel RA:25010092
 
 // Contribuição de Matheus Azevedo Teixeira RA: 25014927
-﻿// Contribuição: Matheus Rosini
+// Contribuição: Matheus Rosini
 // RA: 25015832
 
 import 'package:flutter_test/flutter_test.dart';
