@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import br.com.talhao.service.AnaliseSoloService;
 import br.com.talhao.service.CulturaService;
+import br.com.talhao.service.HistoricoTalhaoService;
 import br.com.talhao.service.JwtService;
 import br.com.talhao.service.PerfilService;
 import br.com.talhao.service.PlantioService;
@@ -48,6 +49,9 @@ class RotasDaApiTest {
 
     @MockitoBean
     private CulturaService culturaService;
+
+    @MockitoBean
+    private HistoricoTalhaoService historicoTalhaoService;
 
     @MockitoBean
     private JwtService jwtService;
@@ -98,6 +102,7 @@ class RotasDaApiTest {
             "PUT,/api/talhoes/t1",
             "DELETE,/api/talhoes/t1",
             "GET,/api/talhoes/t1/status-solo",
+            "GET,/api/talhoes/t1/historico",
             "GET,/api/talhoes/t1/plantios",
             "POST,/api/talhoes/t1/plantios",
             "PUT,/api/talhoes/t1/plantios/p1/colheita",
