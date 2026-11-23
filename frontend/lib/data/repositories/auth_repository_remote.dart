@@ -1,3 +1,5 @@
+// Feito por Leonardo Dionel RA:25010092
+
 // Contribuição de Matheus Azevedo Teixeira RA: 25014927
 
 import '../../core/app_exception.dart';

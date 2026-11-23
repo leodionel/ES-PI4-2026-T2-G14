@@ -1,3 +1,5 @@
+// Feito por Leonardo Dionel RA:25010092
+
 // Texto de um erro para o log. Algumas excecoes de rede vem sem mensagem
 // (aparecia "Falha ao encaminhar ...: null"), entao inclui o tipo.
 final class Descricao {
