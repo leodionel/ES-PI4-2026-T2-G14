@@ -96,6 +96,38 @@ class AuthRepositoryRemote extends AuthRepository {
     notifyListeners();
   }
 
+  // Pede o código de recuperação. As rotas de recuperação são abertas,
+  // por isso não enviam token.
+  @override
+  Future<String?> solicitarRecuperacao(String email) async {
+    final resposta = await _apiClient.post('/api/usuarios/recuperar-senha', {
+      'email': email.trim().toLowerCase(),
+    });
+
+    final codigo = resposta['codigoSimulado'];
+
+    if (codigo is String && codigo.trim().isNotEmpty) {
+      return codigo.trim();
+    }
+
+    return null;
+  }
+
+  // Define a nova senha. O backend responde 204 em caso de sucesso e 400
+  // quando o código é inválido, expirado, já usado ou com tentativas esgotadas.
+  @override
+  Future<void> redefinirSenha({
+    required String email,
+    required String codigo,
+    required String novaSenha,
+  }) async {
+    await _apiClient.post('/api/usuarios/redefinir-senha', {
+      'email': email.trim().toLowerCase(),
+      'codigo': codigo.trim(),
+      'novaSenha': novaSenha,
+    });
+  }
+
   // Encerra a sessão e remove o JWT.
   @override
   Future<void> sair() async {

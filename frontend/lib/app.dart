@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -24,9 +23,7 @@ class App extends StatelessWidget {
           // Verifica se existe uma sessão JWT salva.
           if (auth.iniciando) {
             return const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
+              body: Center(child: CircularProgressIndicator()),
             );
           }
 
@@ -38,38 +35,51 @@ class App extends StatelessWidget {
           return Login(
             // CADASTRO DE USUÁRIO
             aoCriarConta: () async {
-              final cadastrado =
-                  await Navigator.of(context).push<bool>(
-                MaterialPageRoute<bool>(
-                  builder: (_) =>
-                      const CadastroScreen(),
-                ),
+              final cadastrado = await Navigator.of(context).push<bool>(
+                MaterialPageRoute<bool>(builder: (_) => const CadastroScreen()),
               );
 
-              if (cadastrado == true &&
-                  context.mounted) {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(
+              if (cadastrado == true && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text(
                       'Conta criada com sucesso! '
                       'Faça login para continuar.',
                     ),
-                    backgroundColor:
-                        Color(0xFF4A5D23),
+                    backgroundColor: Color(0xFF4A5D23),
                   ),
                 );
               }
             },
 
-            // RECUPERAÇÃO DE SENHA
-            aoRecuperarSenha: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) =>
-                      const RecuperacaoSenha(),
+            // RECUPERAÇÃO DE SENHA (RF03)
+            aoRecuperarSenha: () async {
+              final redefinida = await Navigator.of(context).push<bool>(
+                MaterialPageRoute<bool>(
+                  builder: (_) => RecuperacaoSenha(
+                    aoSolicitarRecuperacao: auth.solicitarRecuperacao,
+                    aoRedefinirSenha: (email, codigo, novaSenha) {
+                      return auth.redefinirSenha(
+                        email: email,
+                        codigo: codigo,
+                        novaSenha: novaSenha,
+                      );
+                    },
+                  ),
                 ),
               );
+
+              if (redefinida == true && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Senha redefinida com sucesso! '
+                      'Faça login com a nova senha.',
+                    ),
+                    backgroundColor: Color(0xFF4A5D23),
+                  ),
+                );
+              }
             },
           );
         },

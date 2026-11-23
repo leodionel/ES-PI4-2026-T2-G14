@@ -43,5 +43,15 @@ class _FakeAuthRepository extends AuthRepository {
   Future<void> entrar(String email, String senha) async {}
 
   @override
+  Future<String?> solicitarRecuperacao(String email) async => null;
+
+  @override
+  Future<void> redefinirSenha({
+    required String email,
+    required String codigo,
+    required String novaSenha,
+  }) async {}
+
+  @override
   Future<void> sair() async {}
 }
