@@ -19,6 +19,7 @@ import br.com.talhao.service.JwtService;
 import br.com.talhao.service.PerfilService;
 import br.com.talhao.service.PlantioService;
 import br.com.talhao.service.PropriedadeService;
+import br.com.talhao.service.RecuperacaoSenhaService;
 import br.com.talhao.service.RelatorioPdfService;
 import br.com.talhao.service.SimulacaoService;
 import br.com.talhao.service.StatusSoloService;
@@ -64,6 +65,9 @@ class RotasDaApiTest {
 
     @MockitoBean
     private PropriedadeService propriedadeService;
+
+    @MockitoBean
+    private RecuperacaoSenhaService recuperacaoSenhaService;
 
     @MockitoBean
     private RelatorioPdfService relatorioPdfService;
@@ -123,12 +127,14 @@ class RotasDaApiTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // TESTE 3 - Cadastro e login continuam abertos (sem token chega na
+    // TESTE 3 - Cadastro, login e recuperacao de senha continuam abertos (sem token chega na
     // validacao do corpo e responde 400, nao 401)
     @ParameterizedTest
     @CsvSource({
             "/api/usuarios/cadastro",
-            "/api/usuarios/login"
+            "/api/usuarios/login",
+            "/api/usuarios/recuperar-senha",
+            "/api/usuarios/redefinir-senha"
     })
     void devemFicarAbertasAsRotasDeCadastroELogin(String caminho)
             throws Exception {
