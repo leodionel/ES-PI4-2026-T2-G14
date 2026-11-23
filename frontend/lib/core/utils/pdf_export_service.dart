@@ -1,4 +1,4 @@
-// FEITO POR (LUCAS KENDI) RA: (25014845)
+// FEITO POR (LUCAS KENDI) RA: (25014845) e  FEITO POR (Demetrius Valverde) RA: (25015035)
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';

@@ -1,3 +1,5 @@
+// FEITO POR (Demetrius Valverde) RA: (25015035)
+
 import 'cenario_resultado.dart';
 
 // Resultado completo da comparacao de culturas.
