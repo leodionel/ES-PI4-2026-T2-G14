@@ -1,3 +1,5 @@
+// FEITO POR (Demetrius Valverde) RA: (25015035)
+
 // Status do solo de um talhão (RN02). Quem calcula é o backend.
 enum StatusSolo {
   semAnalise('Sem análise'),
