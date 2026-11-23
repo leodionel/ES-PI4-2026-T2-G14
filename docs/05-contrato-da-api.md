@@ -175,3 +175,69 @@ Os campos que já existiam (`id`, `nome`, `areaHa`, `criadoEm`, `totalPlantios`,
 
 - **Cultura atual**: segue o `docs/03-modelo-de-dados.md`, o plantio mais recente sem `dataColheita`. Plantio com data futura ainda não conta. Com datas iguais, vale o registrado por último. Cultura que saiu do catálogo é ignorada.
 - **Só a lista** foi enriquecida. O detalhe do talhão continua usando a rota de status e a de plantios.
+
+## Histórico do talhão (RF13)
+
+### GET /api/talhoes/{talhaoId}/historico
+
+Linha do tempo do talhão: plantios, colheitas e análises de solo juntos, do evento mais antigo ao mais recente.
+
+```json
+[
+  {
+    "tipo": "PLANTIO",
+    "data": "2026-03-01",
+    "referenciaId": "665f...",
+    "culturaId": "soja",
+    "culturaNome": "Soja",
+    "analise": null
+  },
+  {
+    "tipo": "ANALISE_SOLO",
+    "data": "2026-04-10",
+    "referenciaId": "665f...",
+    "culturaId": null,
+    "culturaNome": null,
+    "analise": {
+      "ph": 5.5,
+      "fosforo": 12.0,
+      "potassio": 2.5,
+      "saturacaoBases": 60.0,
+      "observacoes": "coleta de rotina"
+    }
+  },
+  {
+    "tipo": "COLHEITA",
+    "data": "2026-08-15",
+    "referenciaId": "665f...",
+    "culturaId": "soja",
+    "culturaNome": "Soja",
+    "analise": null
+  }
+]
+```
+
+| Campo | Significado |
+|---|---|
+| `tipo` | `PLANTIO`, `COLHEITA` ou `ANALISE_SOLO` |
+| `data` | Data do plantio, da colheita ou da coleta da análise |
+| `referenciaId` | `plantioId` nos eventos de plantio e colheita (o mesmo plantio gera os dois); id da análise em `ANALISE_SOLO` |
+| `culturaId`, `culturaNome` | Cultura do plantio e da colheita. `null` em análises |
+| `analise` | pH, fósforo, potássio, saturação por bases e observações. `null` em plantios e colheitas |
+
+Um talhão sem registros devolve `[]`.
+
+| Status | Quando |
+|---|---|
+| 200 | Linha do tempo devolvida |
+| 401 | Token ausente, inválido ou expirado |
+| 404 | Talhão não existe ou não é do usuário logado |
+
+### Decisões
+
+- **Ordem**: da data mais antiga para a mais recente. Para mostrar o mais recente primeiro, o app inverte a lista.
+- **Mesmo dia**: vem primeiro a colheita da safra anterior, depois a análise e por último o plantio novo. Uma colheita no mesmo dia do próprio plantio fica depois dele. Fora isso, eventos do mesmo tipo e dia mantêm a ordem em que o servidor os leu.
+- **Plantio aberto** (sem colheita) gera só o evento de plantio.
+- **Cultura fora do catálogo**: `culturaNome` traz o próprio id da cultura, como na rota de plantios.
+- **Registros sem data** não entram na linha do tempo.
+- A rota já fica protegida pelo padrão `/api/talhoes/**`, sem mudança no interceptor.
