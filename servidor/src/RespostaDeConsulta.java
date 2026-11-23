@@ -1,3 +1,6 @@
+// Contribuição: Matheus Rosini
+// RA: 25015832
+
 
 /*
  * Representa a resposta de uma consulta autenticada

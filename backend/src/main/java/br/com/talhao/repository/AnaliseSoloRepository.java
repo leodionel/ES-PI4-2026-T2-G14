@@ -1,3 +1,6 @@
+// Contribuição: Matheus Rosini
+// RA: 25015832
+
 package br.com.talhao.repository;
 
 import java.util.List;

@@ -1,3 +1,6 @@
+// Contribuição: Matheus Rosini
+// RA: 25015832
+
 public class RespostaDeStatus extends Comunicado {
 
     private static final long serialVersionUID = 1L;

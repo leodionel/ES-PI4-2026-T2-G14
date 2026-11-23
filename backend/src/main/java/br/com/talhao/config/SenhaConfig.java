@@ -1,3 +1,6 @@
+// Contribuição: Matheus Rosini
+// RA: 25015832
+
 package br.com.talhao.config;
 
 import org.springframework.context.annotation.Bean;
