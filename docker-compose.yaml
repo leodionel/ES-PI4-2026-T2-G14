@@ -21,6 +21,7 @@ services:
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/talhao}
       JWT_SECRET_BASE64: "${JWT_SECRET_BASE64:?Defina JWT_SECRET_BASE64 no arquivo .env (gere com openssl rand -base64 32)}"
       CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      RECUPERACAO_EXIBIR_CODIGO: ${RECUPERACAO_EXIBIR_CODIGO:-true}
     ports:
       - "127.0.0.1:8081:8081"
     depends_on:
